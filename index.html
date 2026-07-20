@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数学教材集 ― 円錐曲線</title>
+<style>
+  :root{
+    --bg:#0f1420;
+    --panel:#161c2c;
+    --accent:#ffb347;
+    --accent2:#ff6b4a;
+    --line:#4fc3f7;
+    --text:#e8ecf5;
+    --muted:#8892a6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:linear-gradient(180deg,#0b0e17,#141a2a);
+    color:var(--text);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:48px 16px 60px;
+  }
+  h1{
+    font-size:1.6rem;
+    margin:0 0 8px;
+    letter-spacing:.02em;
+    text-align:center;
+  }
+  p.lead{
+    color:var(--muted);
+    margin:0 0 36px;
+    text-align:center;
+    max-width:520px;
+    line-height:1.7;
+  }
+  .cards{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    justify-content:center;
+    max-width:760px;
+    width:100%;
+  }
+  a.card{
+    display:block;
+    width:320px;
+    background:var(--panel);
+    border:1px solid rgba(79,195,247,0.25);
+    border-radius:14px;
+    padding:24px;
+    text-decoration:none;
+    color:var(--text);
+    transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  a.card:hover{
+    transform:translateY(-3px);
+    border-color:var(--line);
+    box-shadow:0 8px 24px rgba(79,195,247,0.15);
+  }
+  .card .tag{
+    display:inline-block;
+    font-size:.72rem;
+    color:var(--accent);
+    border:1px solid var(--accent);
+    border-radius:999px;
+    padding:2px 10px;
+    margin-bottom:12px;
+    letter-spacing:.03em;
+  }
+  .card h2{
+    font-size:1.1rem;
+    margin:0 0 8px;
+  }
+  .card p{
+    font-size:.88rem;
+    color:var(--muted);
+    line-height:1.6;
+    margin:0;
+  }
+  .card .go{
+    margin-top:16px;
+    font-size:.82rem;
+    color:var(--line);
+  }
+  footer{
+    margin-top:48px;
+    font-size:.75rem;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+  <h1>円錐曲線 教材集</h1>
+  <p class="lead">円錐を切ったときに生まれる2次曲線と、その光学的な性質をインタラクティブに学べる教材です。</p>
+
+  <div class="cards">
+    <a class="card" href="conic-sections.html">
+      <span class="tag">3D可視化</span>
+      <h2>円錐を切る ― 2次曲線が生まれる瞬間</h2>
+      <p>円錐を平面で切断する様子を3Dで動かし、放物線・楕円・双曲線がどのように生まれるかを直感的に理解する教材です。</p>
+      <div class="go">開く →</div>
+    </a>
+
+    <a class="card" href="conics-focus-tool.html">
+      <span class="tag">光線シミュレーション</span>
+      <h2>二次曲線と光 ― 焦点に集まる・逸れる光</h2>
+      <p>放物線・楕円・双曲線の焦点性質を、実際の光の反射シミュレーションで確認できる教材です。</p>
+      <div class="go">開く →</div>
+    </a>
+  </div>
+
+  <footer>都立多摩高等学校 数学科</footer>
+</body>
+</html>

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>二次曲線と光 ― 焦点に集まる・逸れる光</title>
+<style>
+  :root{
+    --bg:#0f1420;
+    --panel:#161c2c;
+    --accent:#ffb347;
+    --accent2:#ff6b4a;
+    --line:#4fc3f7;
+    --text:#e8ecf5;
+    --muted:#8892a6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:linear-gradient(180deg,#0b0e17,#141a2a);
+    color:var(--text);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 12px 40px;
+  }
+  h1{
+    font-size:1.25rem;
+    margin:0 0 4px;
+    letter-spacing:.02em;
+    text-align:center;
+  }
+  .modeToggle{
+    display:flex;
+    gap:6px;
+    background:var(--panel);
+    padding:5px;
+    border-radius:10px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .modeToggle button{
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    padding:8px 16px;
+    border-radius:7px;
+    font-size:0.85rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:all .15s ease;
+    white-space:nowrap;
+  }
+  .modeToggle button.active{
+    background:linear-gradient(135deg,var(--line),#3a8bd6);
+    color:#08131f;
+  }
+  p.modeDesc{
+    color:var(--muted);
+    font-size:0.82rem;
+    text-align:center;
+    max-width:660px;
+    margin:0 0 14px;
+    line-height:1.5;
+    min-height:2.4em;
+  }
+  .stage{
+    position:relative;
+    width:100%;
+    max-width:760px;
+    background:var(--panel);
+    border-radius:14px;
+    padding:14px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+  }
+  canvas{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:8px;
+    background:radial-gradient(ellipse at 50% 30%, #182238 0%, #0d1220 75%);
+    cursor:crosshair;
+  }
+  .hint{
+    position:absolute;
+    top:26px;
+    left:26px;
+    font-size:0.78rem;
+    color:var(--muted);
+    pointer-events:none;
+    background:rgba(0,0,0,0.3);
+    padding:4px 8px;
+    border-radius:6px;
+    max-width:280px;
+    line-height:1.4;
+  }
+  .controls{
+    width:100%;
+    max-width:760px;
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--panel);
+    padding:14px 16px;
+    border-radius:14px;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  label{
+    font-size:0.85rem;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  input[type=range]{
+    width:150px;
+    accent-color:var(--accent);
+  }
+  .valTag{
+    font-variant-numeric:tabular-nums;
+    color:var(--accent);
+    min-width:2.6em;
+    display:inline-block;
+    font-size:0.9rem;
+  }
+  button.action{
+    border:none;
+    border-radius:8px;
+    padding:9px 16px;
+    font-size:0.85rem;
+    cursor:pointer;
+    font-weight:600;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  button.action:active{ transform:scale(0.96); }
+  .btn-sun{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#20140a;
+  }
+  .btn-sun:hover{ filter:brightness(1.08); }
+  .btn-reset{
+    background:#232c42;
+    color:var(--text);
+  }
+  .btn-reset:hover{ filter:brightness(1.2); }
+  .legend{
+    width:100%;
+    max-width:760px;
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    margin-top:12px;
+    font-size:0.78rem;
+    color:var(--muted);
+  }
+  .legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .dot{
+    width:10px;height:10px;border-radius:50%;
+    display:inline-block;
+  }
+  .ln{
+    width:16px;height:2px;
+    display:inline-block;
+  }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<h1 id="mainTitle">🔆 放物線は光をどう集めるか</h1>
+<div class="modeToggle">
+  <button id="modeParabolaBtn" class="active">放物線</button>
+  <button id="modeEllipseBtn">楕円</button>
+  <button id="modeHyperbolaBtn">双曲線</button>
+  <button id="modeCassegrainBtn">カセグレン式望遠鏡</button>
+</div>
+<p class="modeDesc" id="modeDesc">
+  平行に入ってきた光は、放物線に反射するとすべて1つの焦点に集まります。
+</p>
+
+<div class="stage">
+  <canvas id="cv" width="760" height="460"></canvas>
+  <div class="hint" id="hintText">👆 上の余白をクリック → 光線発射</div>
+</div>
+
+<div class="controls">
+  <div class="row" id="parabolaControls">
+    <label for="fSlider">焦点距離 f</label>
+    <input type="range" id="fSlider" min="30" max="130" value="65" step="1">
+    <span class="valTag" id="fVal">65</span>
+  </div>
+  <div class="row hidden" id="ellipseControls">
+    <label for="bSlider">短半径 b</label>
+    <input type="range" id="bSlider" min="70" max="195" value="140" step="1">
+    <span class="valTag" id="bVal">140</span>
+  </div>
+  <div class="row hidden" id="hyperbolaControls">
+    <label for="bHypSlider">b の値</label>
+    <input type="range" id="bHypSlider" min="80" max="200" value="140" step="1">
+    <span class="valTag" id="bHypVal">140</span>
+  </div>
+  <div class="row hidden" id="cassegrainControls">
+    <label for="fpSlider">主鏡の焦点距離 f</label>
+    <input type="range" id="fpSlider" min="100" max="200" value="150" step="1">
+    <span class="valTag" id="fpVal">150</span>
+  </div>
+  <div class="row">
+    <button class="action btn-sun" id="sunBtn">☀️ 平行光線（太陽光）を照射</button>
+    <button class="action btn-reset" id="resetBtn">リセット</button>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="ln" style="background:#4fc3f7"></span>曲線(鏡面)</span>
+  <span><span class="ln" style="background:#ffd27a"></span>入射光・反射光</span>
+  <span><span class="dot" style="background:#ff6b4a"></span>焦点(集まる点)</span>
+  <span><span class="ln" style="background:#5a6478;border-top:2px dashed #5a6478;height:0;"></span>準線・軸・漸近線</span>
+</div>
+
+<script>
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const cx = W/2;
+const scale = 1;
+const RAY_SPEED = 480; // world units / sec
+
+const ORIGIN_Y_P = H - 40;   // 放物線モード: 頂点の高さ
+const YTOP_WORLD  = H - 80;  // 放物線モード: 光線が降ってくる開始高さ
+const ORIGIN_Y_E = H/2;      // 楕円・双曲線モード: 中心の高さ
+
+let mode = 'parabola';       // 'parabola' | 'ellipse' | 'hyperbola' | 'cassegrain'
+
+let f = parseFloat(document.getElementById('fSlider').value);
+
+const aEllipse = 260;
+let bEllipse = parseFloat(document.getElementById('bSlider').value);
+
+const aHyp = 90;
+let bHyp = parseFloat(document.getElementById('bHypSlider').value);
+
+const X_v = 280;             // カセグレン: 主鏡の頂点(world x)
+const OFFSET_X_C = 300;      // カセグレン専用のキャンバス変換オフセット
+let fp = parseFloat(document.getElementById('fpSlider').value); // 主鏡の焦点距離
+
+let rays = [];
+let heat = 0;
+
+// ---------- 座標変換 ----------
+function originY(){ return mode==='parabola' ? ORIGIN_Y_P : ORIGIN_Y_E; }
+function w2c(x,y){ return [cx + x*scale, originY() - y*scale]; }
+function w2cCassegrain(x,y){ return [OFFSET_X_C + x, H/2 - y]; }
+function toCanvas(pt){ return mode==='cassegrain' ? w2cCassegrain(pt.x,pt.y) : w2c(pt.x,pt.y); }
+
+// ---------- 汎用: 2次方程式 ----------
+function solveQuadratic(A,B,C){
+  if(Math.abs(A) < 1e-9){
+    if(Math.abs(B) < 1e-9) return [];
+    return [-C/B];
+  }
+  const disc = B*B - 4*A*C;
+  if(disc < 0) return [];
+  const sq = Math.sqrt(disc);
+  return [(-B-sq)/(2*A), (-B+sq)/(2*A)];
+}
+
+// 双曲線 ((X-centerX)/a)^2 - (Y/b)^2 = 1 と 原点(ox,oy)・方向(dx,dy)の半直線との交点t
+function hyperbolaHitT(ox,oy,dx,dy,centerX,a,b,side){
+  const u = ox - centerX;
+  const A = (dx*dx)/(a*a) - (dy*dy)/(b*b);
+  const B = 2*( (u*dx)/(a*a) - (oy*dy)/(b*b) );
+  const C = (u*u)/(a*a) - (oy*oy)/(b*b) - 1;
+  const roots = solveQuadratic(A,B,C);
+  let best = null;
+  for(const t of roots){
+    if(t <= 1e-6) continue;
+    const rel = (ox + t*dx) - centerX;
+    if(side==='right' && rel < a - 1e-6) continue;
+    if(side==='left'  && rel > -a + 1e-6) continue;
+    if(best===null || t < best) best = t;
+  }
+  return best;
+}
+
+// ---------- 放物線 ----------
+function curveY(x){ return (x*x)/(4*f); }
+function xLimParabola(){
+  const raw = Math.sqrt(Math.max(0, 4*f*YTOP_WORLD));
+  return Math.min(340, raw);
+}
+function addRayParabola(x0, delay=0){
+  const lim = xLimParabola();
+  x0 = Math.max(-lim, Math.min(lim, x0));
+  const yC = curveY(x0);
+  pushRay([{x:x0,y:YTOP_WORLD}, {x:x0,y:yC}, {x:0,y:f}], delay);
+}
+
+// ---------- 楕円 ----------
+function ellipseC(){ return Math.sqrt(Math.max(0, aEllipse*aEllipse - bEllipse*bEllipse)); }
+function ellipseHitT(ox,oy,dx,dy,a,b){
+  const A = (dx*dx)/(a*a) + (dy*dy)/(b*b);
+  const B = 2*( (ox*dx)/(a*a) + (oy*dy)/(b*b) );
+  const C = (ox*ox)/(a*a) + (oy*oy)/(b*b) - 1;
+  const disc = B*B - 4*A*C;
+  if(disc < 0) return null;
+  const sq = Math.sqrt(disc);
+  const t1 = (-B+sq)/(2*A), t2 = (-B-sq)/(2*A);
+  return Math.max(t1,t2);
+}
+function makeEllipseRay(dx,dy, delay=0){
+  const c = ellipseC();
+  const F1 = {x:-c,y:0}, F2 = {x:c,y:0};
+  const t = ellipseHitT(F1.x,F1.y,dx,dy,aEllipse,bEllipse);
+  if(t===null) return;
+  const hit = { x: F1.x + dx*t, y: F1.y + dy*t };
+  pushRay([F1, hit, F2], delay);
+}
+function addRayEllipseFromClick(wx,wy){
+  const c = ellipseC();
+  const F1 = {x:-c,y:0};
+  let dx = wx - F1.x, dy = wy - F1.y;
+  const dist = Math.hypot(dx,dy);
+  if(dist < 8) return;
+  dx/=dist; dy/=dist;
+  makeEllipseRay(dx,dy);
+}
+
+// ---------- 双曲線 ----------
+function addRayHyperbolaFromPoint(x0,y0, delay=0){
+  const c = Math.sqrt(aHyp*aHyp + bHyp*bHyp);
+  const F1 = {x:-c,y:0};
+  let dx = F1.x - x0, dy = F1.y - y0;
+  const dist = Math.hypot(dx,dy);
+  if(dist < 8) return;
+  dx/=dist; dy/=dist;
+  const t = hyperbolaHitT(x0,y0,dx,dy,0,aHyp,bHyp,'right');
+  if(t===null || t > dist - 1e-6) return; // 分岐に届く前にF1に到達＝無効
+  const hit = { x:x0+dx*t, y:y0+dy*t };
+  const F2 = {x:c,y:0};
+  pushRay([{x:x0,y:y0}, hit, F2], delay);
+}
+function shootHyperbola(){
+  const yMax=180, n=8, xStart=300;
+  for(let i=0;i<n;i++){
+    const y0 = -yMax + (2*yMax*i)/(n-1);
+    addRayHyperbolaFromPoint(xStart, y0, i*45);
+  }
+}
+
+// ---------- カセグレン式望遠鏡 ----------
+function cassegrainGeom(){
+  const FprimeX = X_v - fp;
+  const FfinalX = X_v + 55;
+  const Xsc = (FprimeX+FfinalX)/2;
+  const cH = (FfinalX-FprimeX)/2;
+  const aH = 22;
+  const bH = Math.sqrt(Math.max(1, cH*cH - aH*aH));
+  return {FprimeX, FfinalX, Xsc, cH, aH, bH};
+}
+function addRayCassegrain(y0, delay=0){
+  const g = cassegrainGeom();
+  const X_start = -260;
+  const X1 = X_v - (y0*y0)/(4*fp);
+  const P0 = {x:X_start,y:y0};
+  const P1 = {x:X1,y:y0};
+  const Fprime = {x:g.FprimeX, y:0};
+  let dx = Fprime.x-P1.x, dy = Fprime.y-P1.y;
+  const distToF = Math.hypot(dx,dy);
+  const dxu = dx/distToF, dyu = dy/distToF;
+  const t = hyperbolaHitT(P1.x,P1.y,dxu,dyu,g.Xsc,g.aH,g.bH,'right');
+  if(t!==null && t < distToF - 1e-6){
+    const hit = {x:P1.x+dxu*t, y:P1.y+dyu*t};
+    const Ffinal = {x:g.FfinalX, y:0};
+    pushRay([P0,P1,hit,Ffinal], delay);
+  } else {
+    pushRay([P0,P1,Fprime], delay);
+  }
+}
+function shootCassegrain(){
+  const n=9;
+  for(let i=0;i<n;i++){
+    const y0 = -100 + (200*i)/(n-1);
+    addRayCassegrain(y0, i*60);
+  }
+}
+
+// ---------- レイ管理(共通) ----------
+function pushRay(points, delay=0){
+  const segDurs = [];
+  for(let i=0;i<points.length-1;i++){
+    const d = Math.hypot(points[i+1].x-points[i].x, points[i+1].y-points[i].y);
+    segDurs.push(d / RAY_SPEED * 1000);
+  }
+  const totalDur = segDurs.reduce((a,b)=>a+b,0);
+  rays.push({points, segDurs, totalDur, start:performance.now()+delay, hitRegistered:false});
+  if(rays.length > 90) rays.shift();
+}
+
+// ---------- クリック処理 ----------
+function clientToWorld(e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W/rect.width, scaleY = H/rect.height;
+  const px = (e.clientX-rect.left)*scaleX;
+  const py = (e.clientY-rect.top)*scaleY;
+  return { x: (px-cx)/scale, y: (originY()-py)/scale };
+}
+function clientToWorldC(e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W/rect.width, scaleY = H/rect.height;
+  const px = (e.clientX-rect.left)*scaleX;
+  const py = (e.clientY-rect.top)*scaleY;
+  return { x: px-OFFSET_X_C, y: H/2-py };
+}
+
+canvas.addEventListener('click', (e)=>{
+  if(mode==='parabola'){
+    const pt = clientToWorld(e);
+    addRayParabola(pt.x);
+  } else if(mode==='ellipse'){
+    const pt = clientToWorld(e);
+    addRayEllipseFromClick(pt.x, pt.y);
+  } else if(mode==='hyperbola'){
+    const pt = clientToWorld(e);
+    addRayHyperbolaFromPoint(pt.x, pt.y);
+  } else {
+    const pt = clientToWorldC(e);
+    addRayCassegrain(pt.y);
+  }
+});
+
+// ---------- コントロール ----------
+document.getElementById('fSlider').addEventListener('input', (e)=>{
+  f = parseFloat(e.target.value);
+  document.getElementById('fVal').textContent = f;
+});
+document.getElementById('bSlider').addEventListener('input', (e)=>{
+  bEllipse = parseFloat(e.target.value);
+  document.getElementById('bVal').textContent = bEllipse;
+});
+document.getElementById('bHypSlider').addEventListener('input', (e)=>{
+  bHyp = parseFloat(e.target.value);
+  document.getElementById('bHypVal').textContent = bHyp;
+});
+document.getElementById('fpSlider').addEventListener('input', (e)=>{
+  fp = parseFloat(e.target.value);
+  document.getElementById('fpVal').textContent = fp;
+});
+
+document.getElementById('sunBtn').addEventListener('click', ()=>{
+  if(mode==='parabola'){
+    const lim = xLimParabola() * 0.92;
+    const n = 15;
+    for(let i=0;i<n;i++){
+      const x0 = -lim + (2*lim*i)/(n-1);
+      addRayParabola(x0, i*45);
+    }
+  } else if(mode==='ellipse'){
+    const n = 16;
+    for(let i=0;i<n;i++){
+      const ang = (2*Math.PI*i)/n;
+      makeEllipseRay(Math.cos(ang), Math.sin(ang), i*40);
+    }
+  } else if(mode==='hyperbola'){
+    shootHyperbola();
+  } else {
+    shootCassegrain();
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  rays = [];
+  heat = 0;
+});
+
+document.getElementById('modeParabolaBtn').addEventListener('click', ()=>setMode('parabola'));
+document.getElementById('modeEllipseBtn').addEventListener('click', ()=>setMode('ellipse'));
+document.getElementById('modeHyperbolaBtn').addEventListener('click', ()=>setMode('hyperbola'));
+document.getElementById('modeCassegrainBtn').addEventListener('click', ()=>setMode('cassegrain'));
+
+function setMode(m){
+  mode = m;
+  rays = [];
+  heat = 0;
+  document.getElementById('modeParabolaBtn').classList.toggle('active', m==='parabola');
+  document.getElementById('modeEllipseBtn').classList.toggle('active', m==='ellipse');
+  document.getElementById('modeHyperbolaBtn').classList.toggle('active', m==='hyperbola');
+  document.getElementById('modeCassegrainBtn').classList.toggle('active', m==='cassegrain');
+
+  document.getElementById('parabolaControls').classList.toggle('hidden', m!=='parabola');
+  document.getElementById('ellipseControls').classList.toggle('hidden', m!=='ellipse');
+  document.getElementById('hyperbolaControls').classList.toggle('hidden', m!=='hyperbola');
+  document.getElementById('cassegrainControls').classList.toggle('hidden', m!=='cassegrain');
+
+  if(m==='parabola'){
+    document.getElementById('mainTitle').textContent = '🔆 放物線は光をどう集めるか';
+    document.getElementById('modeDesc').textContent = '平行に入ってきた光は、放物線に反射するとすべて1つの焦点に集まります。';
+    document.getElementById('hintText').textContent = '👆 上の余白をクリック → 光線発射';
+    document.getElementById('sunBtn').textContent = '☀️ 平行光線（太陽光）を照射';
+  } else if(m==='ellipse'){
+    document.getElementById('mainTitle').textContent = '🔦 楕円は光をどう集めるか';
+    document.getElementById('modeDesc').textContent = '一方の焦点 F₁ から出た光は、楕円に反射すると必ずもう一方の焦点 F₂ に集まります。';
+    document.getElementById('hintText').textContent = '👆 キャンバス内をクリック → F₁からその方向へレーザー発射';
+    document.getElementById('sunBtn').textContent = '🔦 全方向にレーザーを照射';
+  } else if(m==='hyperbola'){
+    document.getElementById('mainTitle').textContent = '🌀 双曲線は光をどう導くか';
+    document.getElementById('modeDesc').textContent = '焦点 F₁ を狙ってきた光が双曲線に反射すると、必ずもう一方の焦点 F₂ に集まります(反射望遠鏡の副鏡と同じ原理)。';
+    document.getElementById('hintText').textContent = '👆 キャンバス内をクリック → そこからF₁を狙う光線を発射';
+    document.getElementById('sunBtn').textContent = '🌀 収束光線をまとめて照射';
+  } else {
+    document.getElementById('mainTitle').textContent = '🔭 反射望遠鏡の仕組み(放物面鏡＋双曲面鏡)';
+    document.getElementById('modeDesc').textContent = '平行光線が放物面の主鏡で反射して主焦点に集まろうとする直前、双曲面の副鏡が横取りして向きを変え、主鏡の穴を通して最終焦点(接眼部)へ導きます。';
+    document.getElementById('hintText').textContent = '👆 キャンバス内をクリック → その高さの平行光線を1本発射';
+    document.getElementById('sunBtn').textContent = '🔭 平行光線(星の光)をまとめて照射';
+  }
+}
+
+// ---------- 描画:補助 ----------
+function drawGlow(canvasX, canvasY, heatVal){
+  if(heatVal <= 0.5) return;
+  const r = 14 + heatVal*0.55;
+  const grad = ctx.createRadialGradient(canvasX,canvasY,0, canvasX,canvasY,r);
+  grad.addColorStop(0, `rgba(255,180,80,${Math.min(0.85, heatVal/100)})`);
+  grad.addColorStop(1, 'rgba(255,120,60,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(canvasX,canvasY,r,0,Math.PI*2);
+  ctx.fill();
+}
+function drawFocusMarker(canvasX,canvasY,color,label,labelDx=9,labelDy=4){
+  ctx.beginPath();
+  ctx.arc(canvasX,canvasY,5,0,Math.PI*2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.fillStyle = '#e8ecf5';
+  ctx.font = '12px sans-serif';
+  ctx.fillText(label, canvasX+labelDx, canvasY+labelDy);
+}
+
+// ---------- 描画:静的シーン ----------
+function drawStaticParabola(){
+  ctx.save();
+  ctx.strokeStyle = '#3a4258';
+  ctx.setLineDash([5,5]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx,0); ctx.lineTo(cx,H);
+  ctx.stroke();
+
+  const [, dirY] = w2c(0,-f);
+  ctx.beginPath();
+  ctx.moveTo(0,dirY); ctx.lineTo(W,dirY);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#6b7690';
+  ctx.font = '11px sans-serif';
+  ctx.fillText('準線 y = -f', 8, dirY-6);
+
+  const lim = xLimParabola();
+  ctx.beginPath();
+  for(let x=-lim; x<=lim; x+=2){
+    const y = curveY(x);
+    const [xc,yc] = w2c(x,y);
+    if(x===-lim) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
+  }
+  ctx.strokeStyle = '#4fc3f7';
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(79,195,247,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const [fx,fy] = w2c(0,f);
+  drawGlow(fx,fy,heat);
+  drawFocusMarker(fx,fy,'#ff6b4a','焦点 F');
+}
+
+function drawStaticEllipse(){
+  const a = aEllipse, b = bEllipse, c = ellipseC();
+
+  ctx.save();
+  ctx.strokeStyle = '#3a4258';
+  ctx.setLineDash([5,5]);
+  ctx.lineWidth = 1;
+  const [x1,] = w2c(-a-20,0), [x2,] = w2c(a+20,0);
+  const [, midY] = w2c(0,0);
+  ctx.beginPath();
+  ctx.moveTo(Math.max(0,x1), midY); ctx.lineTo(Math.min(W,x2), midY);
+  ctx.stroke();
+  const [, yTop] = w2c(0,b+15);
+  const [, yBot] = w2c(0,-b-15);
+  ctx.beginPath();
+  ctx.moveTo(cx, Math.max(0,yTop)); ctx.lineTo(cx, Math.min(H,yBot));
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.beginPath();
+  const steps = 200;
+  for(let i=0;i<=steps;i++){
+    const t = (2*Math.PI*i)/steps;
+    const x = a*Math.cos(t), y = b*Math.sin(t);
+    const [xc,yc] = w2c(x,y);
+    if(i===0) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = '#4fc3f7';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = 'rgba(79,195,247,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const [f1x,f1y] = w2c(-c,0);
+  const [f2x,f2y] = w2c(c,0);
+
+  drawGlow(f2x,f2y,heat);
+  drawFocusMarker(f1x,f1y,'#8ec9ff','焦点 F₁ (光源)', -78, -10);
+  drawFocusMarker(f2x,f2y,'#ff6b4a','焦点 F₂ (集光点)', 9, 4);
+}
+
+function drawStaticHyperbola(){
+  const a = aHyp, b = bHyp, c = Math.sqrt(a*a+b*b);
+
+  ctx.save();
+  ctx.strokeStyle = '#3a4258';
+  ctx.setLineDash([5,5]);
+  ctx.lineWidth = 1;
+  const slope = b/a;
+  const [ox,oy] = w2c(0,0);
+  const [ax2,ay2] = w2c(380, slope*380);
+  const [bx2,by2] = w2c(380, -slope*380);
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ax2,ay2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(bx2,by2); ctx.stroke();
+  const [lx,] = w2c(-20,0), [rx,] = w2c(420,0);
+  ctx.beginPath(); ctx.moveTo(Math.max(0,lx), oy); ctx.lineTo(Math.min(W,rx), oy); ctx.stroke();
+  ctx.restore();
+
+  ctx.beginPath();
+  const YM = 200;
+  let started = false;
+  for(let y=-YM; y<=YM; y+=3){
+    const x = a*Math.sqrt(1+(y*y)/(b*b));
+    const [xc,yc] = w2c(x,y);
+    if(!started){ ctx.moveTo(xc,yc); started=true; } else ctx.lineTo(xc,yc);
+  }
+  ctx.strokeStyle = '#4fc3f7';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = 'rgba(79,195,247,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const [f1x,f1y] = w2c(-c,0);
+  const [f2x,f2y] = w2c(c,0);
+  drawGlow(f2x,f2y,heat);
+  ctx.beginPath();
+  ctx.arc(f1x,f1y,5,0,Math.PI*2);
+  ctx.strokeStyle = '#8ec9ff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#e8ecf5';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('焦点 F₁(狙う点)', f1x-85, f1y-10);
+  drawFocusMarker(f2x,f2y,'#ff6b4a','焦点 F₂', 9,4);
+}
+
+function drawStaticCassegrain(){
+  const g = cassegrainGeom();
+  const HOLE_R = 15;
+
+  ctx.save();
+  ctx.strokeStyle = '#3a4258';
+  ctx.setLineDash([5,5]);
+  ctx.lineWidth = 1;
+  const [x1,] = w2cCassegrain(-260,0), [x2,] = w2cCassegrain(g.FfinalX+30,0);
+  const [, midY] = w2cCassegrain(0,0);
+  ctx.beginPath(); ctx.moveTo(x1,midY); ctx.lineTo(x2,midY); ctx.stroke();
+  ctx.restore();
+
+  function primaryX(y){ return X_v - (y*y)/(4*fp); }
+
+  for(const range of [[-130,-HOLE_R],[HOLE_R,130]]){
+    ctx.beginPath();
+    let started=false;
+    for(let y=range[0]; y<=range[1]; y+=2){
+      const [xc,yc] = w2cCassegrain(primaryX(y),y);
+      if(!started){ ctx.moveTo(xc,yc); started=true; } else ctx.lineTo(xc,yc);
+    }
+    ctx.strokeStyle='#4fc3f7'; ctx.lineWidth=4;
+    ctx.shadowColor='rgba(79,195,247,0.5)'; ctx.shadowBlur=8;
+    ctx.stroke(); ctx.shadowBlur=0;
+  }
+
+  ctx.beginPath();
+  let started2=false;
+  for(let y=-40; y<=40; y+=2){
+    const x = g.Xsc + g.aH*Math.sqrt(1+(y*y)/(g.bH*g.bH));
+    const [xc,yc] = w2cCassegrain(x,y);
+    if(!started2){ ctx.moveTo(xc,yc); started2=true; } else ctx.lineTo(xc,yc);
+  }
+  ctx.strokeStyle='#c792ea'; ctx.lineWidth=3.5;
+  ctx.shadowColor='rgba(199,146,234,0.5)'; ctx.shadowBlur=8;
+  ctx.stroke(); ctx.shadowBlur=0;
+
+  const [fpx,fpy] = w2cCassegrain(g.FprimeX,0);
+  const [ffx,ffy] = w2cCassegrain(g.FfinalX,0);
+  drawGlow(ffx,ffy,heat);
+  ctx.beginPath(); ctx.arc(fpx,fpy,4,0,Math.PI*2);
+  ctx.strokeStyle='#8ec9ff'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#8892a6'; ctx.font='11px sans-serif';
+  ctx.fillText('主焦点(副鏡が横取り)', fpx-95, fpy-10);
+  drawFocusMarker(ffx,ffy,'#ff6b4a','最終焦点(接眼部)', 9,4);
+
+  ctx.fillStyle='#6b7690'; ctx.font='11px sans-serif';
+  const [pmx,pmy] = w2cCassegrain(X_v,120);
+  ctx.fillText('主鏡(放物面)', pmx-70, pmy+16);
+  const [smx,smy] = w2cCassegrain(g.Xsc,44);
+  ctx.fillText('副鏡(双曲面)', smx-60, smy+16);
+}
+
+function drawStatic(){
+  ctx.clearRect(0,0,W,H);
+  if(mode==='parabola') drawStaticParabola();
+  else if(mode==='ellipse') drawStaticEllipse();
+  else if(mode==='hyperbola') drawStaticHyperbola();
+  else drawStaticCassegrain();
+}
+
+// ---------- 描画:レイ(共通) ----------
+function drawSegment(a,b,color,width,glow=false){
+  ctx.beginPath();
+  ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if(glow){ ctx.shadowColor = color; ctx.shadowBlur = 6; }
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawRay(ray, now){
+  const elapsed = now - ray.start;
+  if(elapsed < 0) return;
+
+  const pts = ray.points.map(p => toCanvas(p));
+  const segDurs = ray.segDurs;
+  const total = ray.totalDur;
+
+  if(elapsed < total){
+    let acc=0, segIdx=0, segT=0;
+    for(let i=0;i<segDurs.length;i++){
+      if(elapsed < acc+segDurs[i]){ segIdx=i; segT=(elapsed-acc)/segDurs[i]; break; }
+      acc += segDurs[i];
+    }
+    for(let i=0;i<segIdx;i++){
+      drawSegment(pts[i], pts[i+1], 'rgba(255,210,122,0.55)', 2);
+    }
+    const a = pts[segIdx], b = pts[segIdx+1];
+    const curX = a[0] + (b[0]-a[0])*segT;
+    const curY = a[1] + (b[1]-a[1])*segT;
+    drawSegment(a, [curX,curY], segIdx===0 ? 'rgba(255,210,122,0.95)' : 'rgba(255,150,90,0.95)', 2.4, true);
+    ctx.beginPath();
+    ctx.arc(curX,curY,3.2,0,Math.PI*2);
+    ctx.fillStyle = '#fff4d6';
+    ctx.fill();
+  } else {
+    if(!ray.hitRegistered){
+      ray.hitRegistered = true;
+      heat = Math.min(100, heat + 7);
+    }
+    const age = elapsed - total;
+    const fade = Math.max(0, 1 - age/2500);
+    if(fade <= 0) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.strokeStyle = `rgba(255,190,110,${0.28*fade})`;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+}
+
+function loop(){
+  const now = performance.now();
+  drawStatic();
+  for(const ray of rays) drawRay(ray, now);
+  heat *= 0.985;
+  rays = rays.filter(r => (now - r.start) < r.totalDur + 2600);
+  requestAnimationFrame(loop);
+}
+
+setMode('parabola');
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>円錐を切る ― 2次曲線が生まれる瞬間</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#173229;
+    --board-2:#1d3d31;
+    --chalk:#eee7d6;
+    --chalk-dim:#b9c4bb;
+    --rail:#0f241d;
+    --c-circle:#e8d48b;
+    --c-ellipse:#8fd3e8;
+    --c-parabola:#e89b9b;
+    --c-hyper:#c9a8e8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #1f4536 0%, transparent 60%),
+      radial-gradient(1000px 800px at 110% 10%, #163527 0%, transparent 55%),
+      var(--board);
+    color:var(--chalk);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    min-height:100vh;
+  }
+  /* faint chalk dust texture */
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.05) 1px, transparent 1px),
+      radial-gradient(1px 1px at 70% 65%, rgba(255,255,255,0.04) 1px, transparent 1px),
+      radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 260px 260px, 340px 340px, 200px 200px;
+    opacity:0.9;
+  }
+  .wrap{position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:36px 22px 70px;}
+
+  header{ text-align:center; margin-bottom:8px; }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px; letter-spacing:.28em; color:var(--chalk-dim);
+    text-transform:uppercase; opacity:.8;
+  }
+  h1{
+    font-family:'Yomogi', sans-serif;
+    font-weight:400;
+    font-size:clamp(30px, 5vw, 52px);
+    margin:10px 0 6px;
+    color:var(--chalk);
+    text-shadow: 0 0 14px rgba(238,231,214,0.18);
+  }
+  .lede{
+    max-width:620px; margin:0 auto; color:var(--chalk-dim);
+    font-size:15px; line-height:1.8;
+  }
+  .divider{
+    width:100%; height:1px; margin:30px 0;
+    background:repeating-linear-gradient(90deg, rgba(238,231,214,.28) 0 10px, transparent 10px 18px);
+  }
+
+  .stage{
+    display:grid;
+    grid-template-columns: 1.25fr 1fr;
+    gap:20px;
+    align-items:stretch;
+  }
+  @media (max-width: 900px){ .stage{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background:linear-gradient(180deg, var(--board-2), var(--rail));
+    border:1px solid rgba(238,231,214,0.14);
+    border-radius:14px;
+    padding:16px;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .panel h2{
+    font-family:'Yomogi', sans-serif; font-weight:400; font-size:19px;
+    margin:2px 4px 10px; color:var(--chalk-dim);
+  }
+
+  #three-holder{
+    position:relative; width:100%; aspect-ratio: 4 / 3.1;
+    border-radius:10px; overflow:hidden;
+    background: radial-gradient(ellipse at 50% 40%, #1e4234 0%, #0e2018 100%);
+    cursor:grab;
+    touch-action:none;
+  }
+  #three-holder:active{ cursor:grabbing; }
+  #three-holder canvas{ display:block; width:100%; height:100%; }
+  .hint{
+    position:absolute; left:10px; bottom:8px; font-size:11px;
+    color:rgba(238,231,214,0.55); font-family:'JetBrains Mono',monospace;
+    pointer-events:none;
+  }
+
+  .type-badge{
+    display:flex; align-items:center; justify-content:space-between;
+    background:rgba(0,0,0,0.18);
+    border:1px dashed rgba(238,231,214,0.25);
+    border-radius:10px;
+    padding:10px 16px;
+    margin-bottom:14px;
+  }
+  .type-badge .label{ font-size:12px; color:var(--chalk-dim); letter-spacing:.1em; }
+  .type-badge .name{
+    font-family:'Yomogi', sans-serif; font-size:34px; line-height:1;
+    transition:color .25s ease, text-shadow .25s ease;
+  }
+
+  .ctrl{ margin:16px 4px 20px; }
+  .ctrl-row{ margin-bottom:16px; }
+  .ctrl-row label{
+    display:flex; justify-content:space-between; font-size:13px;
+    color:var(--chalk-dim); margin-bottom:6px;
+  }
+  .ctrl-row label span.val{
+    font-family:'JetBrains Mono', monospace; color:var(--chalk); font-size:12.5px;
+  }
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:6px; border-radius:3px;
+    background:linear-gradient(90deg, rgba(238,231,214,.5), rgba(238,231,214,.15));
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:17px; height:17px; border-radius:50%;
+    background:var(--chalk); border:2px solid var(--rail);
+    box-shadow:0 0 8px rgba(238,231,214,.6);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:17px; height:17px; border-radius:50%;
+    background:var(--chalk); border:2px solid var(--rail); cursor:pointer;
+  }
+
+  .presets{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .presets button{
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    font-size:13px; padding:7px 13px; border-radius:20px;
+    border:1px solid rgba(238,231,214,0.35);
+    background:transparent; color:var(--chalk); cursor:pointer;
+    transition:all .15s ease;
+  }
+  .presets button:hover{ background:rgba(238,231,214,0.12); }
+  .presets button.active{ background:var(--chalk); color:#152922; font-weight:700; border-color:var(--chalk); }
+
+  .autorotate{
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--chalk-dim);
+    margin-top:10px;
+  }
+  .autorotate input{ accent-color:var(--chalk); }
+
+  #twod-holder{ width:100%; aspect-ratio:1/1; border-radius:10px; background:rgba(0,0,0,0.18); }
+
+  .note{
+    font-size:12px; color:var(--chalk-dim); line-height:1.7; margin-top:10px;
+    border-top:1px dashed rgba(238,231,214,0.2); padding-top:10px;
+  }
+  .note b{ color:var(--chalk); font-weight:600; }
+
+  .explain{
+    margin-top:34px;
+    display:grid; grid-template-columns: repeat(4, 1fr); gap:14px;
+  }
+  @media (max-width: 820px){ .explain{ grid-template-columns: repeat(2,1fr); } }
+  .card{
+    border:1px solid rgba(238,231,214,.16);
+    border-radius:12px; padding:14px 16px;
+    background:rgba(0,0,0,0.14);
+  }
+  .card .tag{
+    font-family:'Yomogi', sans-serif; font-size:22px; margin-bottom:6px; display:block;
+  }
+  .card p{ font-size:12.5px; color:var(--chalk-dim); line-height:1.7; margin:0; }
+
+  footer{
+    text-align:center; margin-top:40px; font-size:11.5px; color:rgba(238,231,214,.4);
+    font-family:'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">CONIC SECTIONS · 円錐曲線</div>
+    <h1>円錐を、好きな角度で切ってみる。</h1>
+    <p class="lede">
+      一つの円錐を平面で切ると、その切り口には円・楕円・放物線・双曲線のどれかが現れます。
+      下の図形を回転させ、スライダーで切断面の「傾き」と「位置」を自由に動かして、
+      切り口の形が変わっていく様子を確かめてみましょう。
+    </p>
+  </header>
+
+  <div class="divider"></div>
+
+  <div class="stage">
+    <div class="panel">
+      <h2>① 円錐と切断面 ― ドラッグで回転</h2>
+      <div id="three-holder">
+        <div class="hint">drag: 回転 / wheel: ズーム</div>
+      </div>
+      <div class="autorotate">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="autorotate" checked> 自動回転
+        </label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>② 切り口の正体</h2>
+      <div class="type-badge">
+        <span class="label">この切り口は…</span>
+        <span class="name" id="type-name">円</span>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <label>円錐の半頂角 α <span class="val" id="val-alpha">32°</span></label>
+          <input type="range" id="alpha" min="15" max="65" step="1" value="32">
+        </div>
+        <div class="ctrl-row">
+          <label>切断面の傾き θ <span class="val" id="val-theta">10°</span></label>
+          <input type="range" id="theta" min="0" max="85" step="0.5" value="10">
+        </div>
+        <div class="ctrl-row">
+          <label>切断面の位置 d <span class="val" id="val-d">1.20</span></label>
+          <input type="range" id="offset" min="-3.4" max="3.4" step="0.05" value="1.2">
+        </div>
+      </div>
+
+      <div class="presets">
+        <button data-preset="circle">円</button>
+        <button data-preset="ellipse">楕円</button>
+        <button data-preset="parabola">放物線</button>
+        <button data-preset="hyperbola">双曲線</button>
+      </div>
+
+      <h2 style="margin-top:22px;">③ 切り口だけを正面から</h2>
+      <div id="twod-holder"><svg id="twod-svg" viewBox="0 0 300 300" width="100%" height="100%"></svg></div>
+
+      <div class="note">
+        放物線になる境目は <b><span id="threshold-text">θ = 58°</span></b> です（θ = 90° − α）。<br>
+        θ がこれより小さいと <b style="color:var(--c-ellipse)">楕円</b>（θ=0で<b style="color:var(--c-circle)">円</b>）、
+        ちょうど等しいと <b style="color:var(--c-parabola)">放物線</b>、
+        大きいと母線の両側を切って <b style="color:var(--c-hyper)">双曲線</b> になります。
+      </div>
+    </div>
+  </div>
+
+  <div class="explain">
+    <div class="card">
+      <span class="tag" style="color:var(--c-circle)">円</span>
+      <p>頂点を通る軸に対して<b style="color:var(--chalk)">垂直</b>な平面で切ると、断面は真ん丸の円になります (θ=0°)。</p>
+    </div>
+    <div class="card">
+      <span class="tag" style="color:var(--c-ellipse)">楕円</span>
+      <p>軸に対する傾きが母線の傾きより小さいうちは、閉じた輪っかのまま伸びて楕円になります。</p>
+    </div>
+    <div class="card">
+      <span class="tag" style="color:var(--c-parabola)">放物線</span>
+      <p>切断面がちょうど1本の母線と平行になる瞬間、輪は閉じきれず片側だけ無限に開いた放物線になります。</p>
+    </div>
+    <div class="card">
+      <span class="tag" style="color:var(--c-hyper)">双曲線</span>
+      <p>さらに傾けると平面は上下2つの円錐(2つの側面)を両方横切り、2本の枝を持つ双曲線が現れます。</p>
+    </div>
+  </div>
+
+  <footer>drag the cone · move the plane · watch the curve change</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- constants ----------
+  var H = 3.0;               // half-height of each nappe (drawing extent)
+  var TYPE_COLORS = {
+    circle:  0xe8d48b,
+    ellipse: 0x8fd3e8,
+    parabola:0xe89b9b,
+    hyperbola:0xc9a8e8
+  };
+  var TYPE_LABEL = { circle:"円", ellipse:"楕円", parabola:"放物線", hyperbola:"双曲線" };
+
+  // ---------- state ----------
+  var state = { alphaDeg: 32, thetaDeg: 10, d0: 1.2 };
+
+  // ---------- DOM ----------
+  var elAlpha = document.getElementById('alpha');
+  var elTheta = document.getElementById('theta');
+  var elOffset = document.getElementById('offset');
+  var valAlpha = document.getElementById('val-alpha');
+  var valTheta = document.getElementById('val-theta');
+  var valD = document.getElementById('val-d');
+  var typeNameEl = document.getElementById('type-name');
+  var thresholdText = document.getElementById('threshold-text');
+  var presetBtns = document.querySelectorAll('.presets button');
+  var autorotateBox = document.getElementById('autorotate');
+  var svg = document.getElementById('twod-svg');
+
+  // ---------- three.js setup ----------
+  var holder = document.getElementById('three-holder');
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(38, 4/3.1, 0.1, 100);
+  var renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  holder.appendChild(renderer.domElement);
+
+  var coneGroup = new THREE.Group();
+  var planeGroup = new THREE.Group();
+  var curveGroup = new THREE.Group();
+  scene.add(coneGroup, planeGroup, curveGroup);
+
+  // faint axis line
+  (function(){
+    var g = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0,-H*1.15,0), new THREE.Vector3(0,H*1.15,0)
+    ]);
+    var m = new THREE.LineDashedMaterial({ color:0xeee7d6, transparent:true, opacity:0.35, dashSize:0.08, gapSize:0.08 });
+    var l = new THREE.Line(g, m); l.computeLineDistances();
+    scene.add(l);
+  })();
+
+  function resizeRenderer(){
+    var w = holder.clientWidth, h = holder.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w/h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resizeRenderer);
+
+  // ---------- manual orbit controls ----------
+  var orbit = { radius: 9.5, az: 0.9, pol: 1.15, target: new THREE.Vector3(0,0.1,0) };
+  var dragging = false, lastX=0, lastY=0;
+  function updateCamera(){
+    var p = orbit;
+    var x = p.target.x + p.radius * Math.sin(p.pol) * Math.sin(p.az);
+    var y = p.target.y + p.radius * Math.cos(p.pol);
+    var z = p.target.z + p.radius * Math.sin(p.pol) * Math.cos(p.az);
+    camera.position.set(x,y,z);
+    camera.lookAt(p.target);
+  }
+  holder.addEventListener('pointerdown', function(e){
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    holder.setPointerCapture(e.pointerId);
+  });
+  holder.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    var dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    orbit.az -= dx * 0.006;
+    orbit.pol -= dy * 0.006;
+    orbit.pol = Math.max(0.25, Math.min(Math.PI - 0.25, orbit.pol));
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+  holder.addEventListener('wheel', function(e){
+    e.preventDefault();
+    orbit.radius *= (1 + e.deltaY*0.001);
+    orbit.radius = Math.max(4.5, Math.min(18, orbit.radius));
+  }, { passive:false });
+
+  // ---------- build cone (wireframe sketch style) ----------
+  function buildCone(alphaDeg){
+    while(coneGroup.children.length) coneGroup.remove(coneGroup.children[0]);
+    var alpha = alphaDeg * Math.PI/180;
+    var R = H * Math.tan(alpha);
+    var N = 40;
+    var mat = new THREE.LineBasicMaterial({ color:0xeee7d6, transparent:true, opacity:0.55 });
+    var matDim = new THREE.LineBasicMaterial({ color:0xeee7d6, transparent:true, opacity:0.22 });
+
+    function rimPoints(y){
+      var pts = [];
+      for(var i=0;i<=N;i++){
+        var t = i/N * Math.PI*2;
+        pts.push(new THREE.Vector3(R*Math.cos(t), y, R*Math.sin(t)));
+      }
+      return pts;
+    }
+    var rimTop = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rimPoints(H)), mat);
+    var rimBot = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rimPoints(-H)), mat);
+    coneGroup.add(rimTop, rimBot);
+
+    var GEN = 22;
+    var genPts = [];
+    for(var i=0;i<GEN;i++){
+      var t = i/GEN * Math.PI*2;
+      var x = R*Math.cos(t), z = R*Math.sin(t);
+      genPts.push(new THREE.Vector3(0,0,0), new THREE.Vector3(x,H,z));
+      genPts.push(new THREE.Vector3(0,0,0), new THREE.Vector3(x,-H,z));
+    }
+    var genLines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(genPts), matDim);
+    coneGroup.add(genLines);
+
+    // subtle translucent surface fill so the plane reads as "inside" the cone
+    var coneGeo1 = new THREE.ConeGeometry(R, H, 40, 1, true);
+    var surfMat = new THREE.MeshBasicMaterial({ color:0x2f5a47, transparent:true, opacity:0.10, side:THREE.DoubleSide });
+    var coneMeshTop = new THREE.Mesh(coneGeo1, surfMat);
+    coneMeshTop.position.y = H/2; // ConeGeometry apex points +y, base at -H/2 by default -> apex at +H, base at 0 originally; adjust below
+    // three ConeGeometry: apex at +height/2, base circle at -height/2, centered at local origin.
+    // We want apex at world origin, base at y=H. So shift by +H/2 then it spans (-H/2..+H/2) around... redo cleanly:
+    coneMeshTop.position.set(0, H/2, 0);
+    var coneMeshBot = new THREE.Mesh(coneGeo1.clone(), surfMat.clone());
+    coneMeshBot.rotation.x = Math.PI; // flip so apex points down
+    coneMeshBot.position.set(0, -H/2, 0);
+    coneGroup.add(coneMeshTop, coneMeshBot);
+  }
+
+  // ---------- geometry helpers for intersection ----------
+  function computeIntersection(alphaDeg, thetaDeg, d0){
+    var alpha = alphaDeg*Math.PI/180;
+    var theta = thetaDeg*Math.PI/180;
+    var sinA=Math.sin(alpha), cosA=Math.cos(alpha);
+    var sinT=Math.sin(theta), cosT=Math.cos(theta);
+    var N = 900;
+    var pts = []; // world points, null marks break
+    var maxS = 60;
+    for(var i=0;i<=N;i++){
+      var t = i/N * Math.PI*2;
+      var ct = Math.cos(t), st = Math.sin(t);
+      var denom = sinT*sinA*ct + cosT*cosA;
+      if(Math.abs(denom) < 1e-3){ pts.push(null); continue; }
+      var s = d0/denom;
+      if(Math.abs(s) > maxS){ pts.push(null); continue; }
+      var y = s*cosA;
+      if(Math.abs(y) > H + 1e-6){ pts.push(null); continue; }
+      var x = s*sinA*ct;
+      var z = s*sinA*st;
+      pts.push({x:x,y:y,z:z,t:t});
+    }
+    return pts;
+  }
+
+  function classify(alphaDeg, thetaDeg){
+    var threshold = 90 - alphaDeg;
+    if(thetaDeg < 0.6) return 'circle';
+    if(Math.abs(thetaDeg - threshold) <= 0.6) return 'parabola';
+    if(thetaDeg < threshold) return 'ellipse';
+    return 'hyperbola';
+  }
+
+  // split points array (with nulls) into contiguous segments; also detect fully-closed loop
+  function segmentsFrom(pts){
+    var segs = [];
+    var cur = [];
+    for(var i=0;i<pts.length;i++){
+      if(pts[i]===null){
+        if(cur.length>1) segs.push(cur);
+        cur = [];
+      } else {
+        cur.push(pts[i]);
+      }
+    }
+    if(cur.length>1) segs.push(cur);
+    // if the whole thing had no nulls at all -> close the loop
+    var hasNull = pts.some(function(p){return p===null;});
+    if(!hasNull && segs.length===1){
+      segs[0] = segs[0].concat([segs[0][0]]);
+    }
+    return segs;
+  }
+
+  // ---------- build plane + curve ----------
+  function rebuildCut(){
+    while(planeGroup.children.length) planeGroup.remove(planeGroup.children[0]);
+    while(curveGroup.children.length) curveGroup.remove(curveGroup.children[0]);
+
+    var alphaDeg = state.alphaDeg, thetaDeg = state.thetaDeg, d0 = state.d0;
+    var theta = thetaDeg*Math.PI/180;
+    var type = classify(alphaDeg, thetaDeg);
+    var color = TYPE_COLORS[type];
+
+    var n = new THREE.Vector3(Math.sin(theta), Math.cos(theta), 0);
+    var e1 = new THREE.Vector3(Math.cos(theta), -Math.sin(theta), 0);
+    var e2 = new THREE.Vector3(0,0,1);
+
+    // plane mesh
+    var size = 7.2;
+    var planeGeo = new THREE.PlaneGeometry(size, size);
+    var planeMat = new THREE.MeshBasicMaterial({ color:color, transparent:true, opacity:0.16, side:THREE.DoubleSide });
+    var planeMesh = new THREE.Mesh(planeGeo, planeMat);
+    var basis = new THREE.Matrix4().makeBasis(e1, e2, n);
+    planeMesh.quaternion.setFromRotationMatrix(basis);
+    planeMesh.position.copy(n.clone().multiplyScalar(d0));
+    planeGroup.add(planeMesh);
+
+    // plane border
+    var half = size/2;
+    var corners = [
+      e1.clone().multiplyScalar(-half).add(e2.clone().multiplyScalar(-half)),
+      e1.clone().multiplyScalar(half).add(e2.clone().multiplyScalar(-half)),
+      e1.clone().multiplyScalar(half).add(e2.clone().multiplyScalar(half)),
+      e1.clone().multiplyScalar(-half).add(e2.clone().multiplyScalar(half)),
+    ].map(function(v){ return v.add(n.clone().multiplyScalar(d0)); });
+    corners.push(corners[0]);
+    var borderMat = new THREE.LineBasicMaterial({ color: color, transparent:true, opacity:0.5 });
+    planeGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(corners), borderMat));
+
+    // intersection curve
+    var pts = computeIntersection(alphaDeg, thetaDeg, d0);
+    var segs = segmentsFrom(pts);
+    var curveMat = new THREE.LineBasicMaterial({ color: color, linewidth:2 });
+    segs.forEach(function(seg){
+      var vecs = seg.map(function(p){ return new THREE.Vector3(p.x,p.y,p.z); });
+      var geo = new THREE.BufferGeometry().setFromPoints(vecs);
+      curveGroup.add(new THREE.Line(geo, curveMat));
+    });
+
+    // ----- 2D true-shape drawing -----
+    draw2D(pts, theta, color);
+
+    // ----- labels -----
+    typeNameEl.textContent = TYPE_LABEL[type];
+    typeNameEl.style.color = '#' + color.toString(16).padStart(6,'0');
+    typeNameEl.style.textShadow = '0 0 16px ' + '#'+color.toString(16).padStart(6,'0') + '88';
+
+    var threshold = 90 - alphaDeg;
+    thresholdText.textContent = 'θ = ' + threshold.toFixed(0) + '°';
+
+    presetBtns.forEach(function(b){ b.classList.toggle('active', b.dataset.preset === type); });
+  }
+
+  function draw2D(pts, theta, color){
+    var cosT = Math.cos(theta), sinT = Math.sin(theta);
+    var uv = pts.map(function(p){
+      if(p===null) return null;
+      var u = p.x*cosT - p.y*sinT;
+      var v = p.z;
+      return {u:u, v:v};
+    });
+    var segs = [];
+    var cur = [];
+    for(var i=0;i<uv.length;i++){
+      if(uv[i]===null){ if(cur.length>1) segs.push(cur); cur=[]; }
+      else cur.push(uv[i]);
+    }
+    if(cur.length>1) segs.push(cur);
+    var hasNull = uv.some(function(p){return p===null;});
+    if(!hasNull && segs.length===1) segs[0] = segs[0].concat([segs[0][0]]);
+
+    // fit into viewBox [0,300]x[0,300] preserving aspect, centered
+    var allU=[], allV=[];
+    segs.forEach(function(s){ s.forEach(function(p){ allU.push(p.u); allV.push(p.v); }); });
+    var pad = 30;
+    var svgns = 'http://www.w3.org/2000/svg';
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+    // axes
+    var axisG = document.createElementNS(svgns,'g');
+    axisG.setAttribute('stroke', 'rgba(238,231,214,0.28)');
+    axisG.setAttribute('stroke-width','1');
+    var hLine = document.createElementNS(svgns,'line');
+    hLine.setAttribute('x1',0); hLine.setAttribute('x2',300); hLine.setAttribute('y1',150); hLine.setAttribute('y2',150);
+    var vLine = document.createElementNS(svgns,'line');
+    vLine.setAttribute('x1',150); vLine.setAttribute('x2',150); vLine.setAttribute('y1',0); vLine.setAttribute('y2',300);
+    axisG.appendChild(hLine); axisG.appendChild(vLine);
+    svg.appendChild(axisG);
+
+    if(allU.length < 2){ return; }
+    var minU=Math.min.apply(null,allU), maxU=Math.max.apply(null,allU);
+    var minV=Math.min.apply(null,allV), maxV=Math.max.apply(null,allV);
+    var spanU = Math.max(maxU-minU, 0.4);
+    var spanV = Math.max(maxV-minV, 0.4);
+    var cu=(minU+maxU)/2, cv=(minV+maxV)/2;
+    var scale = Math.min((300-2*pad)/spanU, (300-2*pad)/spanV);
+    scale = Math.min(scale, 90); // avoid extreme zoom on tiny curves
+
+    function X(u){ return 150 + (u-cu)*scale; }
+    function Y(v){ return 150 - (v-cv)*scale; }
+
+    var hex = '#'+color.toString(16).padStart(6,'0');
+    segs.forEach(function(seg){
+      var d = seg.map(function(p,idx){
+        return (idx===0?'M':'L') + X(p.u).toFixed(1) + ',' + Y(p.v).toFixed(1);
+      }).join(' ');
+      var path = document.createElementNS(svgns,'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', hex);
+      path.setAttribute('stroke-width','2.6');
+      path.setAttribute('stroke-linecap','round');
+      path.setAttribute('filter','drop-shadow(0 0 4px ' + hex + '99)');
+      svg.appendChild(path);
+    });
+  }
+
+  // ---------- UI wiring ----------
+  function syncLabels(){
+    valAlpha.textContent = state.alphaDeg + '°';
+    valTheta.textContent = state.thetaDeg.toFixed(1).replace(/\.0$/,'') + '°';
+    valD.textContent = state.d0.toFixed(2);
+  }
+
+  elAlpha.addEventListener('input', function(){
+    state.alphaDeg = parseFloat(this.value);
+    syncLabels();
+    buildCone(state.alphaDeg);
+    rebuildCut();
+  });
+  elTheta.addEventListener('input', function(){
+    state.thetaDeg = parseFloat(this.value);
+    syncLabels();
+    rebuildCut();
+  });
+  elOffset.addEventListener('input', function(){
+    state.d0 = parseFloat(this.value);
+    syncLabels();
+    rebuildCut();
+  });
+
+  presetBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var threshold = 90 - state.alphaDeg;
+      var target;
+      if(btn.dataset.preset==='circle') target = 0;
+      else if(btn.dataset.preset==='ellipse') target = Math.max(threshold*0.5, 2);
+      else if(btn.dataset.preset==='parabola') target = threshold;
+      else target = Math.min(threshold + 15, 85);
+      state.thetaDeg = target;
+      elTheta.value = target;
+      syncLabels();
+      rebuildCut();
+    });
+  });
+
+  // ---------- render loop ----------
+  function animate(){
+    requestAnimationFrame(animate);
+    if(!dragging && autorotateBox.checked){ orbit.az += 0.0022; }
+    updateCamera();
+    renderer.render(scene, camera);
+  }
+
+  // ---------- init ----------
+  function init(){
+    resizeRenderer();
+    buildCone(state.alphaDeg);
+    rebuildCut();
+    syncLabels();
+    updateCamera();
+    animate();
+  }
+  window.addEventListener('load', function(){
+    // ensure layout settled before measuring holder size
+    setTimeout(init, 30);
+  });
+})();
+</script>
+</body>
+</html>
