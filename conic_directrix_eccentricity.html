@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>準線と離心率 ― 2次曲線ジェネレータ</title>
+<style>
+  :root{
+    --paper:#f6f3ec;
+    --paper-line:#d8d2c2;
+    --ink:#26313c;
+    --ink-soft:#5b6470;
+    --accent:#3b4c7a;      /* focus / UI accent (indigo) */
+    --ellipse:#1e6e62;     /* teal */
+    --parabola:#b8862c;    /* amber */
+    --hyperbola:#b5423a;   /* brick red */
+    --paper-edge:#c9c2ae;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; height:100%;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  header{
+    padding:18px 28px 10px;
+    border-bottom:1px solid var(--paper-edge);
+  }
+  header h1{
+    margin:0 0 4px;
+    font-family:Georgia,"Hiragino Mincho ProN","Yu Mincho",serif;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:0.02em;
+    color:var(--ink);
+  }
+  header p{
+    margin:0;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .layout{
+    flex:1;
+    display:flex;
+    gap:0;
+    min-height:0;
+  }
+  .panel{
+    width:340px;
+    min-width:300px;
+    padding:20px 22px 24px;
+    border-right:1px solid var(--paper-edge);
+    overflow-y:auto;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 27px,
+        var(--paper-line) 27px, var(--paper-line) 28px
+      ),
+      var(--paper);
+  }
+  .stage{
+    flex:1;
+    position:relative;
+    min-width:0;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:100%;
+    background:var(--paper);
+  }
+
+  .section-label{
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:22px 0 8px;
+    font-weight:600;
+  }
+  .section-label:first-of-type{margin-top:0;}
+
+  .row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:2px;
+  }
+  .row label{ font-size:14px; font-weight:600; }
+  .row .val{
+    font-family:"SF Mono","Menlo",Consolas,monospace;
+    font-size:14px;
+    color:var(--accent);
+    font-weight:700;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:6px;
+    border-radius:3px;
+    background:linear-gradient(to right, var(--accent) 0%, var(--paper-edge) 0%);
+    margin:8px 0 4px;
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:17px; height:17px; border-radius:50%;
+    background:var(--paper);
+    border:3px solid var(--accent);
+    cursor:pointer;
+    margin-top:-1px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--paper);
+    border:3px solid var(--accent);
+    cursor:pointer;
+  }
+  .hint{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    line-height:1.5;
+    margin-top:2px;
+  }
+
+  .presets{
+    display:flex; gap:6px; margin-top:10px;
+  }
+  .presets button{
+    flex:1;
+    padding:7px 4px;
+    font-size:12px;
+    border-radius:6px;
+    border:1px solid var(--paper-edge);
+    background:#fff;
+    cursor:pointer;
+    color:var(--ink);
+    font-weight:600;
+    transition:transform .08s ease, border-color .12s ease;
+  }
+  .presets button:hover{ border-color:var(--accent); }
+  .presets button:active{ transform:scale(0.96); }
+
+  .badge{
+    margin-top:16px;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid var(--paper-edge);
+    background:#fff;
+  }
+  .badge .type{
+    font-family:Georgia,"Hiragino Mincho ProN",serif;
+    font-size:19px;
+    font-weight:700;
+    margin-bottom:2px;
+  }
+  .badge .eq{
+    font-family:"SF Mono","Menlo",Consolas,monospace;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+
+  .readout{
+    margin-top:10px;
+    border:1px solid var(--paper-edge);
+    border-radius:10px;
+    background:#fff;
+    padding:12px 14px;
+  }
+  .readout .line{
+    display:flex; justify-content:space-between;
+    font-size:13px;
+    padding:4px 0;
+    border-bottom:1px dashed var(--paper-edge);
+  }
+  .readout .line:last-child{ border-bottom:none; }
+  .readout .k{ color:var(--ink-soft); }
+  .readout .v{
+    font-family:"SF Mono","Menlo",Consolas,monospace;
+    font-weight:700;
+  }
+
+  .legend{
+    display:flex; flex-wrap:wrap; gap:8px;
+    margin-top:14px;
+  }
+  .legend span{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11.5px; color:var(--ink-soft);
+  }
+  .legend i{
+    width:10px; height:10px; border-radius:50%;
+    display:inline-block;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>準線と離心率 ― 2次曲線ジェネレータ</h1>
+  <p>焦点 F と準線からの距離の比（離心率 e）で曲線が決まる ―― r = ep / (1 + e cosθ)</p>
+</header>
+
+<div class="layout">
+  <div class="panel">
+
+    <div class="section-label">準線の位置</div>
+    <div class="row"><label>焦点からの距離 p</label><span class="val" id="pVal">1.50</span></div>
+    <input type="range" id="pSlider" min="0.4" max="4.0" step="0.05" value="1.5">
+    <div class="hint">準線を焦点から遠ざけると、曲線全体が外側へ膨らみます。</div>
+
+    <div class="section-label">離心率</div>
+    <div class="row"><label>e （曲線の種類を決める）</label><span class="val" id="eVal">0.60</span></div>
+    <input type="range" id="eSlider" min="0.10" max="2.20" step="0.01" value="0.60">
+    <div class="presets">
+      <button data-e="0.4">e = 0.4</button>
+      <button data-e="1.0">e = 1.0</button>
+      <button data-e="1.6">e = 1.6</button>
+    </div>
+    <div class="hint">e &lt; 1 は楕円、e = 1 は放物線、e &gt; 1 は双曲線になります。</div>
+
+    <div class="section-label">点 P の位置（角度 θ）</div>
+    <div class="row"><label>θ</label><span class="val" id="thVal">0°</span></div>
+    <input type="range" id="thSlider" min="-179" max="179" step="1" value="0">
+    <div class="hint">P を動かして、焦点までの距離と準線までの距離の比が常に e になることを確認できます。</div>
+
+    <div class="badge">
+      <div class="type" id="typeLabel">楕円 (Ellipse)</div>
+      <div class="eq" id="eqLabel">r = 0.938 / (1 + 0.6 cosθ)</div>
+    </div>
+
+    <div class="readout">
+      <div class="line"><span class="k">PF（焦点までの距離）</span><span class="v" id="pf">-</span></div>
+      <div class="line"><span class="k">PH（準線までの距離）</span><span class="v" id="ph">-</span></div>
+      <div class="line"><span class="k">PF ÷ PH</span><span class="v" id="ratio">-</span></div>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:var(--ellipse)"></i>楕円 e&lt;1</span>
+      <span><i style="background:var(--parabola)"></i>放物線 e=1</span>
+      <span><i style="background:var(--hyperbola)"></i>双曲線 e&gt;1</span>
+    </div>
+
+  </div>
+
+  <div class="stage">
+    <canvas id="cv"></canvas>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+
+const pSlider = document.getElementById('pSlider');
+const eSlider = document.getElementById('eSlider');
+const thSlider = document.getElementById('thSlider');
+const pVal = document.getElementById('pVal');
+const eVal = document.getElementById('eVal');
+const thVal = document.getElementById('thVal');
+const typeLabel = document.getElementById('typeLabel');
+const eqLabel = document.getElementById('eqLabel');
+const pfEl = document.getElementById('pf');
+const phEl = document.getElementById('ph');
+const ratioEl = document.getElementById('ratio');
+
+const COLORS = {
+  ellipse: getComputedStyle(document.documentElement).getPropertyValue('--ellipse').trim(),
+  parabola: getComputedStyle(document.documentElement).getPropertyValue('--parabola').trim(),
+  hyperbola: getComputedStyle(document.documentElement).getPropertyValue('--hyperbola').trim(),
+  ink: getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),
+  inkSoft: getComputedStyle(document.documentElement).getPropertyValue('--ink-soft').trim(),
+  accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+  gridLine: '#d8d2c2'
+};
+
+function resize(){
+  const stage = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = stage.clientWidth * dpr;
+  canvas.height = stage.clientHeight * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function curveType(e){
+  if (Math.abs(e-1) < 0.008) return 'parabola';
+  return e < 1 ? 'ellipse' : 'hyperbola';
+}
+
+function updateSliderFill(slider){
+  const min = parseFloat(slider.min), max = parseFloat(slider.max), v = parseFloat(slider.value);
+  const pct = (v-min)/(max-min)*100;
+  slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--paper-edge) ${pct}%)`;
+}
+
+function fmt(n){ return n.toFixed(2); }
+
+function draw(){
+  const p = parseFloat(pSlider.value);
+  const e = parseFloat(eSlider.value);
+  let thP = parseFloat(thSlider.value) * Math.PI/180;
+
+  const type = curveType(e);
+  const color = COLORS[type];
+
+  // limit theta slider range for hyperbola (branch only exists where 1+e cos theta > 0)
+  let thetaLimitDeg = 179;
+  if (e > 1){
+    const thetaC = Math.acos(-1/e); // radians, curve exists for |theta| < thetaC
+    thetaLimitDeg = Math.max(1, Math.floor(thetaC*180/Math.PI) - 1);
+    thSlider.min = -thetaLimitDeg;
+    thSlider.max = thetaLimitDeg;
+    if (thP > thetaC) { thP = thetaC*0.98; thSlider.value = Math.round(thP*180/Math.PI); }
+    if (thP < -thetaC) { thP = -thetaC*0.98; thSlider.value = Math.round(thP*180/Math.PI); }
+  } else {
+    thSlider.min = -179; thSlider.max = 179;
+  }
+  updateSliderFill(thSlider);
+  thVal.textContent = Math.round(thP*180/Math.PI) + '°';
+
+  // --- sample curve in world coordinates (focus at origin, directrix at x=p) ---
+  const N = 1600;
+  const pts = []; // array of arrays (subpaths), each array of {x,y}
+  let current = [];
+  const RCAP_BBOX = Math.max(6, p*6); // cap used only for bounding-box / discontinuity detection
+  let prevValid = false;
+  for (let i=0;i<=N;i++){
+    const th = -Math.PI + (2*Math.PI*i/N);
+    const denom = 1 + e*Math.cos(th);
+    let valid = denom > 0.03; // avoid asymptotic blow-up
+    if (valid){
+      const r = e*p/denom;
+      if (r > 40) valid = false; // hard cap so canvas stays sane
+      if (valid){
+        const x = r*Math.cos(th), y = r*Math.sin(th);
+        if (!prevValid) current = [];
+        current.push({x,y});
+        prevValid = true;
+        if (i===N && current.length) pts.push(current);
+        continue;
+      }
+    }
+    if (prevValid && current.length){ pts.push(current); current = []; }
+    prevValid = false;
+  }
+  if (current.length) pts.push(current);
+
+  // bounding box for auto-scale (use capped values)
+  let maxAbsX = p, maxAbsY = 1;
+  for (const seg of pts) for (const pt of seg){
+    maxAbsX = Math.max(maxAbsX, Math.min(Math.abs(pt.x), RCAP_BBOX));
+    maxAbsY = Math.max(maxAbsY, Math.min(Math.abs(pt.y), RCAP_BBOX));
+  }
+
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const cx = W*0.42, cy = H*0.5;
+  const marginFactor = 0.82;
+  let scale = Math.min( (W*marginFactor/2)/maxAbsX, (H*marginFactor/2)/maxAbsY );
+  scale = Math.max(20, Math.min(scale, 160));
+
+  function toPx(x,y){ return [cx + x*scale, cy - y*scale]; }
+
+  // --- background ---
+  ctx.clearRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle = COLORS.gridLine;
+  ctx.lineWidth = 1;
+  const gridStep = scale; // 1 world unit
+  ctx.beginPath();
+  for (let x = cx % gridStep; x < W; x += gridStep){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+  for (let y = cy % gridStep; y < H; y += gridStep){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+
+  // axes
+  ctx.strokeStyle = '#bdb6a2';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(0,cy); ctx.lineTo(W,cy);
+  ctx.moveTo(cx,0); ctx.lineTo(cx,H);
+  ctx.stroke();
+
+  // directrix
+  const [dx] = toPx(p,0);
+  ctx.save();
+  ctx.strokeStyle = COLORS.inkSoft;
+  ctx.setLineDash([6,5]);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(dx,0); ctx.lineTo(dx,H);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = COLORS.inkSoft;
+  ctx.font = '12px "Hiragino Kaku Gothic ProN", sans-serif';
+  ctx.fillText('準線  x = ' + fmt(p), dx+6, 18);
+
+  // curve
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.6;
+  ctx.lineJoin = 'round';
+  for (const seg of pts){
+    if (seg.length < 2) continue;
+    ctx.beginPath();
+    let started = false;
+    for (const pt of seg){
+      const [px,py] = toPx(pt.x, pt.y);
+      if (!started){ ctx.moveTo(px,py); started = true; } else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  // focus F
+  const [fx,fy] = toPx(0,0);
+  ctx.fillStyle = COLORS.accent;
+  ctx.beginPath(); ctx.arc(fx,fy,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = COLORS.ink;
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.fillText('F', fx+9, fy-8);
+
+  // --- point P and construction lines ---
+  const denomP = 1 + e*Math.cos(thP);
+  const rP = e*p/Math.max(denomP, 0.03);
+  const Px = rP*Math.cos(thP), Py = rP*Math.sin(thP);
+  const Hx = p, Hy = Py; // foot of perpendicular onto directrix
+
+  const [ppx,ppy] = toPx(Px,Py);
+  const [phx,phy] = toPx(Hx,Hy);
+
+  // PF line
+  ctx.strokeStyle = COLORS.accent;
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(ppx,ppy); ctx.stroke();
+
+  // PH line (dashed, perpendicular to directrix)
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.setLineDash([4,4]);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(ppx,ppy); ctx.lineTo(phx,phy); ctx.stroke();
+  ctx.restore();
+
+  // H marker
+  ctx.fillStyle = COLORS.inkSoft;
+  ctx.beginPath(); ctx.arc(phx,phy,3.2,0,Math.PI*2); ctx.fill();
+
+  // P marker
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(ppx,ppy,5.5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = COLORS.ink;
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.fillText('P', ppx+8, ppy-8);
+
+  // --- text panels update ---
+  const PF = rP;
+  const PH = Math.abs(p - Px);
+  pfEl.textContent = fmt(PF);
+  phEl.textContent = fmt(PH);
+  ratioEl.textContent = (PH > 0.0001) ? fmt(PF/PH) : '—';
+
+  const typeNames = { ellipse:'楕円 (Ellipse)', parabola:'放物線 (Parabola)', hyperbola:'双曲線 (Hyperbola)' };
+  typeLabel.textContent = typeNames[type];
+  typeLabel.style.color = color;
+  eqLabel.textContent = `r = ${fmt(e*p)} / (1 + ${fmt(e)} cosθ)`;
+}
+
+pSlider.addEventListener('input', ()=>{ pVal.textContent = fmt(parseFloat(pSlider.value)); updateSliderFill(pSlider); draw(); });
+eSlider.addEventListener('input', ()=>{ eVal.textContent = fmt(parseFloat(eSlider.value)); updateSliderFill(eSlider); draw(); });
+thSlider.addEventListener('input', ()=>{ draw(); });
+
+document.querySelectorAll('.presets button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    eSlider.value = btn.dataset.e;
+    eVal.textContent = fmt(parseFloat(eSlider.value));
+    updateSliderFill(eSlider);
+    draw();
+  });
+});
+
+updateSliderFill(pSlider);
+updateSliderFill(eSlider);
+updateSliderFill(thSlider);
+resize();
+</script>
+</body>
+</html>
