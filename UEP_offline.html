@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>UEP - Unified Experience of Plotting（オフライン版）</title>
+<style>
+  :root{
+    --bg:#1e2430;
+    --panel:#262d3a;
+    --grid:#3a4256;
+    --grid-strong:#4d5877;
+    --axis:#8b93a7;
+    --text:#e6e9f0;
+    --sub:#9aa3b8;
+    --accentA:#ff6b6b;
+    --accentB:#4dabf7;
+    --point:#ffd43b;
+    --selected:#63e6be;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  }
+  .app{
+    display:flex;
+    height:100vh;
+    width:100vw;
+  }
+  #canvasWrap{
+    flex:1 1 auto;
+    position:relative;
+    overflow:hidden;
+  }
+  canvas{
+    display:block;
+    background:var(--bg);
+    touch-action:none;
+  }
+  #floatLabel{
+    position:absolute;
+    pointer-events:none;
+    background:rgba(20,24,34,0.92);
+    border:1px solid var(--grid-strong);
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:12.5px;
+    line-height:1.5;
+    white-space:nowrap;
+    transform:translate(14px, 14px);
+    box-shadow:0 4px 10px rgba(0,0,0,0.35);
+    display:none;
+    z-index:5;
+  }
+  #floatLabel b{color:var(--point);}
+  #floatLabel .dA{color:var(--accentA);}
+  #floatLabel .dB{color:var(--accentB);}
+
+  #panel{
+    flex:0 0 340px;
+    background:var(--panel);
+    border-left:1px solid var(--grid-strong);
+    padding:18px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  h1{
+    font-size:16px;
+    margin:0 0 4px 0;
+  }
+  .status{
+    font-size:13px;
+    background:#1b202b;
+    border:1px solid var(--grid-strong);
+    border-radius:8px;
+    padding:10px 12px;
+    line-height:1.6;
+  }
+  .status .step{
+    font-weight:bold;
+  }
+  .refRow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    margin-top:4px;
+  }
+  .dot{
+    width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+  }
+  .dotA{background:var(--accentA);}
+  .dotB{background:var(--accentB);}
+  .dotP{background:var(--point);}
+
+  .modeSwitch{
+    display:flex;
+    border:1px solid var(--grid-strong);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .modeBtn{
+    flex:1 1 50%;
+    background:#2c3444;
+    color:var(--sub);
+    border:none;
+    padding:10px 6px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .modeBtn.active{
+    background:#3d4a63;
+    color:var(--text);
+    font-weight:bold;
+  }
+  .modeBtn:not(.active):hover{background:#333c4e;}
+
+  button.actionBtn{
+    background:#333c4d;
+    color:var(--text);
+    border:1px solid var(--grid-strong);
+    border-radius:6px;
+    padding:8px 10px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  button.actionBtn:hover{background:#404a5f;}
+  button.actionBtn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btnRow{display:flex;gap:8px;flex-wrap:wrap;}
+
+  table{
+    border-collapse:collapse;
+    width:100%;
+    font-size:12.5px;
+  }
+  th,td{
+    border-bottom:1px solid var(--grid);
+    padding:5px 4px;
+    text-align:right;
+  }
+  th{color:var(--sub);font-weight:normal;}
+  td:first-child, th:first-child{text-align:left;}
+  tr.pointRow{cursor:pointer;}
+  tr.pointRow:hover{background:#2f3648;}
+  tr.pointRow.selected{background:#2a4a44; box-shadow:inset 3px 0 0 var(--selected);}
+  #pointsSection{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:8px;}
+  #pointsTableWrap{overflow-y:auto; flex:1 1 auto; border:1px solid var(--grid); border-radius:6px;}
+  .empty{color:var(--sub); font-size:12.5px; padding:8px;}
+  .hint{font-size:11.5px; color:var(--sub); line-height:1.6;}
+
+  .sectionLabel{font-size:13px; color:var(--sub);}
+  .zoomRow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .zoomBtn{
+    background:#333c4d;
+    color:var(--text);
+    border:1px solid var(--grid-strong);
+    border-radius:6px;
+    width:34px;height:34px;
+    font-size:16px;
+    cursor:pointer;
+  }
+  .zoomBtn:hover{background:#404a5f;}
+  #zoomLabel{
+    flex:1 1 auto;
+    text-align:center;
+    font-size:12.5px;
+    color:var(--sub);
+  }
+  #saveSection{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    border:1px solid var(--grid-strong);
+    border-radius:8px;
+    padding:10px 12px;
+    background:#1b202b;
+  }
+  .saveRow{display:flex; gap:8px;}
+  #saveNameInput{
+    flex:1 1 auto;
+    background:#2c3444;
+    border:1px solid var(--grid-strong);
+    color:var(--text);
+    border-radius:6px;
+    padding:7px 8px;
+    font-size:13px;
+  }
+  #saveNameInput:focus{outline:1px solid var(--selected);}
+  #savedListWrap{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:160px;
+    overflow-y:auto;
+  }
+  .savedItem{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:#242b39;
+    border:1px solid var(--grid);
+    border-radius:6px;
+    padding:6px 8px;
+    font-size:12px;
+  }
+  .savedItem .savedName{flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .savedItem .savedTime{color:var(--sub); font-size:10.5px; white-space:nowrap;}
+  .savedItem button{
+    background:#333c4d;
+    color:var(--text);
+    border:1px solid var(--grid-strong);
+    border-radius:5px;
+    padding:4px 7px;
+    font-size:11.5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .savedItem button:hover{background:#404a5f;}
+  .savedItem button.deleteBtn:hover{background:#5c3030;}
+
+  /* ---- トップバー・タブ・保存記録一覧 ---- */
+  html,body{height:auto; min-height:100%;}
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:10px 18px;
+    background:var(--panel);
+    border-bottom:1px solid var(--grid-strong);
+    flex-wrap:wrap;
+  }
+  .topbar h1{margin:0; font-size:15px; white-space:nowrap; display:flex; align-items:baseline; gap:8px;}
+  .appName{font-weight:800; letter-spacing:0.5px;}
+  .appTagline{font-weight:400; font-size:11px; color:var(--sub); white-space:nowrap;}
+  .nicknameRow{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12.5px;
+    color:var(--sub);
+  }
+  #nicknameInput{
+    background:#2c3444;
+    border:1px solid var(--grid-strong);
+    color:var(--text);
+    border-radius:6px;
+    padding:6px 8px;
+    font-size:13px;
+    width:120px;
+  }
+  #nicknameInput:focus{outline:1px solid var(--selected);}
+  .tabSwitch{
+    display:flex;
+    gap:6px;
+    margin-left:auto;
+  }
+  .tabBtn{
+    background:#2c3444;
+    color:var(--sub);
+    border:1px solid var(--grid-strong);
+    border-radius:8px;
+    padding:8px 14px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .tabBtn.active{background:#3d4a63; color:var(--text); font-weight:bold;}
+  .tabBtn:not(.active):hover{background:#333c4e;}
+
+  .appRow{height:calc(100vh - 53px);}
+
+  #viewBanner{
+    display:none;
+    flex-direction:column;
+    gap:8px;
+    background:#3a2f1b;
+    border:1px solid #7a5a2a;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:12.5px;
+  }
+  #viewBanner b{color:#ffd43b;}
+
+  .galleryWrap{
+    padding:24px;
+    max-width:900px;
+    margin:0 auto;
+  }
+  .galleryToolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .galleryEmpty{color:var(--sub); font-size:13px; padding:20px 0;}
+  #importHint{margin-bottom:14px;}
+
+  /* ---- 狭い画面向け：右パネルをドロワー化 ---- */
+  #panelToggleBtn{display:none;}
+  .panelCloseBtn{display:none; align-self:flex-end; margin-bottom:-4px;}
+  #panelBackdrop{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    z-index:55;
+  }
+  body.panelOpen #panelBackdrop{display:block;}
+
+  @media (max-width: 780px){
+    .topbar h1{font-size:12.5px;}
+    .appTagline{display:none;}
+    .nicknameRow{font-size:11px;}
+    #nicknameInput{width:84px;}
+    .tabBtn{padding:8px 10px; font-size:12px;}
+    #panelToggleBtn{display:inline-flex;}
+
+    #panel{
+      position:fixed;
+      top:0;
+      right:0;
+      bottom:0;
+      width:84%;
+      max-width:320px;
+      z-index:60;
+      transform:translateX(100%);
+      transition:transform .25s ease;
+      box-shadow:-8px 0 24px rgba(0,0,0,0.5);
+      border-left:1px solid var(--grid-strong);
+    }
+    body.panelOpen #panel{transform:translateX(0);}
+    .panelCloseBtn{display:flex;}
+  }
+  .galleryCard{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--panel);
+    border:1px solid var(--grid-strong);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:10px;
+  }
+  .galleryCard .gTitle{font-weight:bold; font-size:14px;}
+  .galleryCard .gMeta{font-size:12px; color:var(--sub); margin-top:2px;}
+  .galleryCard .gCount{font-size:12px; color:var(--sub);}
+  .galleryCard .gSpacer{flex:1 1 auto;}
+  .gThumb{
+    width:72px;
+    height:50px;
+    border-radius:6px;
+    object-fit:cover;
+    background:#131722;
+    border:1px solid var(--grid-strong);
+    flex:0 0 auto;
+  }
+  .gThumbEmpty{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--sub);
+    font-size:10.5px;
+    text-align:center;
+  }
+  .galleryCard button{
+    background:#333c4d;
+    color:var(--text);
+    border:1px solid var(--grid-strong);
+    border-radius:6px;
+    padding:7px 12px;
+    font-size:12.5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .galleryCard button:hover{background:#404a5f;}
+  .galleryCard button.deleteBtn:hover{background:#5c3030;}
+  .galleryCard button.deleteBtn.confirming{background:#7a3030; border-color:#a34a4a; color:#ffd7d7; font-weight:bold;}
+  .galleryCard button.editBtn:hover{background:#2f4a5c;}
+  .galleryCard button:disabled{opacity:0.5; cursor:not-allowed;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><span class="appName">UEP</span><span class="appTagline">Unified Experience of Plotting／座標平面 点打ちツール（オフライン版・このブラウザだけに保存）</span></h1>
+  <div class="nicknameRow">
+    名前:
+    <input type="text" id="nicknameInput" placeholder="あなたの名前" maxlength="20">
+  </div>
+  <div class="tabSwitch">
+    <button class="tabBtn" id="panelToggleBtn" title="設定パネルの開閉">☰ 設定</button>
+    <button class="tabBtn active" id="tabPlotBtn">① 点を打つ</button>
+    <button class="tabBtn" id="tabGalleryBtn">② 保存した記録</button>
+  </div>
+</div>
+
+<div id="panelBackdrop"></div>
+
+<div class="app appRow" id="plotView">
+  <div id="canvasWrap">
+    <canvas id="cv"></canvas>
+    <div id="floatLabel"></div>
+  </div>
+
+  <div id="panel">
+    <button class="actionBtn panelCloseBtn" id="panelCloseBtn">✕ 閉じる</button>
+
+    <div id="viewBanner">
+      <div id="viewBannerMsg"></div>
+      <button class="actionBtn" id="backToOwnBtn">自分の作業に戻る</button>
+    </div>
+
+    <div class="hint">距離を見ながら点を打ち、一覧の距離は打った瞬間の値で固定されます。</div>
+
+    <div class="modeSwitch">
+      <button class="modeBtn active" id="modePlaceBtn">① 新しい点を打つ</button>
+      <button class="modeBtn" id="modeEditBtn">② 点を編集する</button>
+    </div>
+
+    <div class="status">
+      <div class="step" id="stepText">基準点Aをクリックしてください</div>
+      <div class="refRow"><span class="dot dotA"></span> <span id="refAText">A: 未設定</span></div>
+      <div class="refRow"><span class="dot dotB"></span> <span id="refBText">B: 未設定</span></div>
+    </div>
+
+    <div class="btnRow">
+      <button class="actionBtn" id="resetRefBtn">基準点をリセット</button>
+      <button class="actionBtn" id="clearPointsBtn">打った点をクリア</button>
+      <button class="actionBtn" id="undoBtn">最後の点を取り消す</button>
+    </div>
+
+    <div>
+      <div class="sectionLabel">表示（拡大縮小）</div>
+      <div class="zoomRow" style="margin-top:6px;">
+        <button class="zoomBtn" id="zoomOutBtn">－</button>
+        <span id="zoomLabel">100%</span>
+        <button class="zoomBtn" id="zoomInBtn">＋</button>
+        <button class="actionBtn" id="zoomResetBtn">リセット</button>
+      </div>
+    </div>
+
+    <div id="saveSection">
+      <div class="sectionLabel">この記録を保存</div>
+      <div class="saveRow">
+        <input type="text" id="saveNameInput" placeholder="タイトルを入力">
+        <button class="actionBtn" id="saveBtn">保存する</button>
+      </div>
+      <div class="hint" id="saveStatusMsg" style="display:none;"></div>
+      <button class="actionBtn" id="downloadFallbackBtn" style="display:none;">バックアップとしてファイルに書き出す</button>
+      <div class="hint">保存すると「②保存した記録」タブからいつでも呼び出せます（このブラウザだけに保存され、他の人とは共有されません）。</div>
+    </div>
+
+    <div id="pointsSection">
+      <div style="font-size:13px; color:var(--sub);">打った点の一覧（クリックで編集選択）</div>
+      <div id="pointsTableWrap">
+        <table id="pointsTable">
+          <thead>
+            <tr><th>#</th><th>x</th><th>y</th><th>距離A</th><th>距離B</th></tr>
+          </thead>
+          <tbody id="pointsTbody"></tbody>
+        </table>
+        <div class="empty" id="emptyMsg">まだ点がありません</div>
+      </div>
+    </div>
+
+    <div class="hint" id="hintBox">
+      ・グリッド1マス = 1単位（拡大率100%で40px）<br>
+      ・「①新しい点を打つ」モード：クリックで基準点A→B→以降は点を追加します。距離は打った瞬間の値で固定されます<br>
+      ・「②点を編集する」モード：一覧の行、またはキャンバス上の点をクリックすると選択され、選択中の点と基準点A・Bをドラッグで動かせます。動かすと選択中の点の距離だけが再計算されます<br>
+      ・拡大縮小：＋／－ボタン、またはキャンバス上でマウスホイールを回すとカーソル位置を中心に拡大縮小します<br>
+      ・保存：タイトルを付けて保存すると「保存した記録」タブからいつでも呼び出せます（このブラウザだけに保存されます。作業中の内容も自動で下書き保存されます）
+    </div>
+  </div>
+</div>
+
+<div class="galleryView" id="galleryView" style="display:none;">
+  <div class="galleryWrap">
+    <div id="galleryContent">
+      <div class="galleryToolbar">
+        <div class="sectionLabel">保存した記録一覧（このブラウザだけに保存されています）</div>
+        <button class="actionBtn" id="galleryRefreshBtn">更新</button>
+        <button class="actionBtn" id="importFileBtn">ファイルを読み込む</button>
+        <input type="file" id="importFileInput" accept="application/json,.json" multiple style="display:none;">
+      </div>
+      <div class="hint" id="importHint">
+        「バックアップとしてファイルに書き出す」で保存したJSONファイルをここから読み込むと、別のパソコン・ブラウザに記録を移すことができます。
+      </div>
+      <div class="hint" id="galleryImportMsg" style="display:none;"></div>
+      <div id="galleryList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('cv');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('canvasWrap');
+  const floatLabel = document.getElementById('floatLabel');
+  const stepText = document.getElementById('stepText');
+  const refAText = document.getElementById('refAText');
+  const refBText = document.getElementById('refBText');
+  const pointsTbody = document.getElementById('pointsTbody');
+  const emptyMsg = document.getElementById('emptyMsg');
+  const resetRefBtn = document.getElementById('resetRefBtn');
+  const clearPointsBtn = document.getElementById('clearPointsBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const modePlaceBtn = document.getElementById('modePlaceBtn');
+  const modeEditBtn = document.getElementById('modeEditBtn');
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+  const zoomLabel = document.getElementById('zoomLabel');
+  const saveNameInput = document.getElementById('saveNameInput');
+  const saveBtn = document.getElementById('saveBtn');
+  const nicknameInput = document.getElementById('nicknameInput');
+  const tabPlotBtn = document.getElementById('tabPlotBtn');
+  const tabGalleryBtn = document.getElementById('tabGalleryBtn');
+  const plotView = document.getElementById('plotView');
+  const panelToggleBtn = document.getElementById('panelToggleBtn');
+  const panelCloseBtn = document.getElementById('panelCloseBtn');
+  const panelBackdrop = document.getElementById('panelBackdrop');
+  const galleryView = document.getElementById('galleryView');
+  const galleryList = document.getElementById('galleryList');
+  const galleryRefreshBtn = document.getElementById('galleryRefreshBtn');
+  const importFileBtn = document.getElementById('importFileBtn');
+  const importFileInput = document.getElementById('importFileInput');
+  const galleryImportMsg = document.getElementById('galleryImportMsg');
+  let galleryImportMsgTimer = null;
+  const galleryContent = document.getElementById('galleryContent');
+  const viewBanner = document.getElementById('viewBanner');
+  const viewBannerMsg = document.getElementById('viewBannerMsg');
+  const backToOwnBtn = document.getElementById('backToOwnBtn');
+  const saveSection = document.getElementById('saveSection');
+  const saveStatusMsg = document.getElementById('saveStatusMsg');
+  const downloadFallbackBtn = document.getElementById('downloadFallbackBtn');
+
+  let viewOnly = false;               // true = ギャラリーの記録を閲覧中（編集不可）
+  let ownRefPoints = [];              // 特別モードに切り替える前の自分の作業を退避しておく
+  let ownPlacedPoints = [];
+  let bannerMode = null;               // null | 'view' | 'edit'
+  let editingId = null;                // 編集中の記録のid（新規保存時はnull）
+  let editingOriginal = null;          // 編集中の記録の元のcreator/createdAtなどを保持
+
+  const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const BASE_SCALE = 40; // px per unit at 100%
+  const MIN_SCALE = 6;
+  const MAX_SCALE = 400;
+  let scale = BASE_SCALE; // px per unit, mutable (zoom)
+  let originX, originY;
+  let viewInitialized = false;
+
+  let mode = 'place'; // 'place' | 'edit'
+  let refPoints = []; // {x,y} in math coords, max 2
+  let placedPoints = []; // {x,y,distA,distB}  <-- distA/distB fixed at creation / last edit
+  let selectedIndex = -1; // index into placedPoints, only meaningful in edit mode
+
+  let draggingTarget = null; // {type:'ref'|'point', index}
+  let mouseDownHitSomething = false;
+  let mouseMath = null;
+
+  function resizeCanvas(){
+    const rect = wrap.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    if(!viewInitialized){
+      originX = canvas.width/2;
+      originY = canvas.height/2;
+      viewInitialized = true;
+    }
+    draw();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function screenToMath(sx, sy){
+    return { x: (sx - originX)/scale, y: (originY - sy)/scale };
+  }
+  function mathToScreen(x, y){
+    return { x: originX + x*scale, y: originY - y*scale };
+  }
+  function updateZoomLabel(){
+    zoomLabel.textContent = Math.round((scale/BASE_SCALE)*100) + '%';
+  }
+  function zoomAt(sx, sy, factor){
+    const before = screenToMath(sx, sy);
+    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale*factor));
+    originX = sx - before.x*scale;
+    originY = sy + before.y*scale;
+    updateZoomLabel();
+    draw();
+  }
+  function dist(p1, p2){
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  }
+  function fmt(n){
+    return (Math.round(n*100)/100).toFixed(2);
+  }
+  function getVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function recomputeDistancesFor(idx){
+    const p = placedPoints[idx];
+    if(!p) return;
+    if(refPoints[0]) p.distA = dist(p, refPoints[0]);
+    if(refPoints[1]) p.distB = dist(p, refPoints[1]);
+  }
+
+  function draw(){
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    // grid
+    ctx.lineWidth = 1;
+    const startCol = Math.floor(-originX/scale);
+    const endCol = Math.ceil((w-originX)/scale);
+    const startRow = Math.floor(-originY/scale);
+    const endRow = Math.ceil((h-originY)/scale);
+
+    for(let i=startCol;i<=endCol;i++){
+      const x = originX + i*scale;
+      ctx.strokeStyle = (i%5===0) ? getVar('--grid-strong') : getVar('--grid');
+      ctx.beginPath();
+      ctx.moveTo(x,0); ctx.lineTo(x,h);
+      ctx.stroke();
+    }
+    for(let j=startRow;j<=endRow;j++){
+      const y = originY + j*scale;
+      ctx.strokeStyle = (j%5===0) ? getVar('--grid-strong') : getVar('--grid');
+      ctx.beginPath();
+      ctx.moveTo(0,y); ctx.lineTo(w,y);
+      ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = getVar('--axis');
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, originY); ctx.lineTo(w, originY);
+    ctx.moveTo(originX, 0); ctx.lineTo(originX, h);
+    ctx.stroke();
+
+    ctx.fillStyle = getVar('--sub');
+    ctx.font = '11px sans-serif';
+    for(let i=startCol;i<=endCol;i++){
+      if(i%5===0 && i!==0){
+        const x = originX + i*scale;
+        ctx.fillText(i.toString(), x+2, originY+14);
+      }
+    }
+    for(let j=startRow;j<=endRow;j++){
+      if(j%5===0 && j!==0){
+        const y = originY - j*scale;
+        ctx.fillText(j.toString(), originX+4, y-2);
+      }
+    }
+
+    // guide lines: in place mode (or touch placing/dragging) show live cursor guides; in edit mode (or touch dragging a point) show guides from selected point
+    if(refPoints.length===2){
+      const placeGuideActive = mouseMath && (mode==='place' || touchMode==='placingNew');
+      const editGuideActive = selectedIndex!==-1 && placedPoints[selectedIndex] && (mode==='edit' || touchMode==='dragPoint');
+      if(placeGuideActive){
+        drawGuideLine(mouseMath, refPoints[0], getVar('--accentA'));
+        drawGuideLine(mouseMath, refPoints[1], getVar('--accentB'));
+      } else if(editGuideActive){
+        const sp = placedPoints[selectedIndex];
+        drawGuideLine(sp, refPoints[0], getVar('--accentA'));
+        drawGuideLine(sp, refPoints[1], getVar('--accentB'));
+      }
+    }
+
+    // ref points
+    refPoints.forEach((p, idx)=>{
+      const s = mathToScreen(p.x, p.y);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, IS_TOUCH ? 10 : 7, 0, Math.PI*2);
+      ctx.fillStyle = idx===0 ? getVar('--accentA') : getVar('--accentB');
+      ctx.fill();
+      ctx.strokeStyle = mode==='edit' ? '#fff' : 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = mode==='edit' ? 2 : 1.2;
+      ctx.stroke();
+      ctx.fillStyle = getVar('--text');
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(idx===0 ? 'A' : 'B', s.x+9, s.y-9);
+    });
+
+    // placed points
+    placedPoints.forEach((p, idx)=>{
+      const s = mathToScreen(p.x, p.y);
+      const isSel = (mode==='edit' && idx===selectedIndex) || (touchMode==='dragPoint' && idx===touchTargetIndex);
+      const baseR = IS_TOUCH ? 7 : 5;
+      const selR = IS_TOUCH ? 10 : 8;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, isSel ? selR : baseR, 0, Math.PI*2);
+      ctx.fillStyle = isSel ? getVar('--selected') : getVar('--point');
+      ctx.fill();
+      ctx.strokeStyle = isSel ? '#fff' : '#000';
+      ctx.lineWidth = isSel ? 2.5 : 1;
+      ctx.stroke();
+      ctx.fillStyle = getVar('--sub');
+      ctx.font = isSel ? 'bold 11px sans-serif' : '11px sans-serif';
+      ctx.fillText((idx+1).toString(), s.x+8, s.y+4);
+    });
+  }
+
+  function drawGuideLine(mMath, refMath, color){
+    const s1 = mathToScreen(mMath.x, mMath.y);
+    const s2 = mathToScreen(refMath.x, refMath.y);
+    ctx.save();
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(s1.x, s1.y);
+    ctx.lineTo(s2.x, s2.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function hitTestRef(sx, sy){
+    const r = IS_TOUCH ? 18 : 9;
+    for(let i=0;i<refPoints.length;i++){
+      const s = mathToScreen(refPoints[i].x, refPoints[i].y);
+      if(Math.hypot(s.x-sx, s.y-sy) <= r) return i;
+    }
+    return -1;
+  }
+  function hitTestPlaced(sx, sy){
+    const r = IS_TOUCH ? 18 : 9;
+    for(let i=0;i<placedPoints.length;i++){
+      const s = mathToScreen(placedPoints[i].x, placedPoints[i].y);
+      if(Math.hypot(s.x-sx, s.y-sy) <= r) return i;
+    }
+    return -1;
+  }
+
+  function updateModeButtons(){
+    modePlaceBtn.classList.toggle('active', mode==='place');
+    modeEditBtn.classList.toggle('active', mode==='edit');
+    canvas.style.cursor = mode==='edit' ? 'pointer' : 'crosshair';
+  }
+
+  function updateStatus(){
+    if(mode==='place'){
+      if(refPoints.length===0){
+        stepText.textContent = '① 基準点Aをクリックしてください';
+      } else if(refPoints.length===1){
+        stepText.textContent = '② 基準点Bをクリックしてください';
+      } else {
+        stepText.textContent = '③ 点を打つ位置をクリックしてください（距離を見ながら）';
+      }
+    } else {
+      if(selectedIndex===-1){
+        stepText.textContent = '編集モード：一覧の行、またはキャンバス上の点をクリックして選択';
+      } else {
+        stepText.textContent = `点#${selectedIndex+1} を選択中：この点と基準点A・Bをドラッグで動かせます`;
+      }
+    }
+    refAText.textContent = refPoints[0] ? `A: (${fmt(refPoints[0].x)}, ${fmt(refPoints[0].y)})` : 'A: 未設定';
+    refBText.textContent = refPoints[1] ? `B: (${fmt(refPoints[1].x)}, ${fmt(refPoints[1].y)})` : 'B: 未設定';
+    undoBtn.disabled = placedPoints.length===0;
+  }
+
+  function updateTable(){
+    scheduleDraftSave();
+    pointsTbody.innerHTML = '';
+    if(placedPoints.length===0){
+      emptyMsg.style.display = 'block';
+    } else {
+      emptyMsg.style.display = 'none';
+      placedPoints.forEach((p, idx)=>{
+        const dA = (p.distA!==undefined) ? fmt(p.distA) : '-';
+        const dB = (p.distB!==undefined) ? fmt(p.distB) : '-';
+        const tr = document.createElement('tr');
+        tr.className = 'pointRow' + ((mode==='edit' && idx===selectedIndex) ? ' selected' : '');
+        tr.innerHTML = `<td>${idx+1}</td><td>${fmt(p.x)}</td><td>${fmt(p.y)}</td><td>${dA}</td><td>${dB}</td>`;
+        tr.addEventListener('click', ()=>{
+          if(viewOnly) return;
+          mode = 'edit';
+          selectedIndex = idx;
+          updateModeButtons();
+          updateStatus();
+          updateTable();
+          draw();
+        });
+        pointsTbody.appendChild(tr);
+      });
+    }
+  }
+
+  function updateFloatLabel(sx, sy){
+    const hideForEdit = (mode==='edit' && !touchMode);
+    if(!mouseMath || hideForEdit){ floatLabel.style.display='none'; return; }
+    let html = `<b>(${fmt(mouseMath.x)}, ${fmt(mouseMath.y)})</b>`;
+    if(refPoints.length>=1){
+      html += `<br><span class="dA">A距離: ${fmt(dist(mouseMath, refPoints[0]))}</span>`;
+    }
+    if(refPoints.length>=2){
+      html += `<br><span class="dB">B距離: ${fmt(dist(mouseMath, refPoints[1]))}</span>`;
+    }
+    floatLabel.innerHTML = html;
+    floatLabel.style.left = sx + 'px';
+    floatLabel.style.top = sy + 'px';
+    floatLabel.style.display = 'block';
+  }
+
+  function handlePointerDown(sx, sy){
+    if(viewOnly) return;
+    if(mode==='edit'){
+      const refHit = hitTestRef(sx, sy);
+      if(refHit !== -1){
+        draggingTarget = {type:'ref', index: refHit};
+        mouseDownHitSomething = true;
+        return;
+      }
+      const pHit = hitTestPlaced(sx, sy);
+      if(pHit !== -1){
+        selectedIndex = pHit;
+        draggingTarget = {type:'point', index: pHit};
+        mouseDownHitSomething = true;
+        updateStatus();
+        updateTable();
+        draw();
+        return;
+      }
+      mouseDownHitSomething = false;
+      draggingTarget = null;
+    } else {
+      mouseDownHitSomething = false;
+      draggingTarget = null;
+    }
+  }
+
+  function handlePointerMove(sx, sy){
+    mouseMath = screenToMath(sx, sy);
+    if(draggingTarget){
+      if(draggingTarget.type === 'ref'){
+        refPoints[draggingTarget.index] = mouseMath;
+        if(selectedIndex !== -1) recomputeDistancesFor(selectedIndex);
+      } else if(draggingTarget.type === 'point'){
+        const p = placedPoints[draggingTarget.index];
+        p.x = mouseMath.x;
+        p.y = mouseMath.y;
+        recomputeDistancesFor(draggingTarget.index);
+      }
+      updateStatus();
+      updateTable();
+    }
+    updateFloatLabel(sx, sy);
+    draw();
+  }
+
+  function handlePointerUp(){
+    draggingTarget = null;
+  }
+
+  function handlePointerTap(sx, sy){
+    if(viewOnly) return;
+    if(mode==='edit'){
+      if(!mouseDownHitSomething){
+        selectedIndex = -1;
+        updateStatus();
+        updateTable();
+        draw();
+      }
+      mouseDownHitSomething = false;
+      return;
+    }
+
+    // place mode
+    if(hitTestRef(sx, sy) !== -1) return;
+    if(hitTestPlaced(sx, sy) !== -1) return;
+
+    const m = screenToMath(sx, sy);
+
+    if(refPoints.length < 2){
+      refPoints.push(m);
+    } else {
+      placedPoints.push({
+        x: m.x,
+        y: m.y,
+        distA: dist(m, refPoints[0]),
+        distB: dist(m, refPoints[1])
+      });
+    }
+    updateStatus();
+    updateTable();
+    draw();
+  }
+
+  canvas.addEventListener('mousedown', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    handlePointerDown(e.clientX - rect.left, e.clientY - rect.top);
+  });
+
+  canvas.addEventListener('mousemove', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    handlePointerMove(e.clientX - rect.left, e.clientY - rect.top);
+  });
+
+  canvas.addEventListener('mouseleave', ()=>{
+    mouseMath = null;
+    floatLabel.style.display = 'none';
+    draw();
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    handlePointerUp();
+  });
+
+  canvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+    zoomAt(sx, sy, factor);
+  }, { passive:false });
+
+  zoomInBtn.addEventListener('click', ()=>{
+    zoomAt(canvas.width/2, canvas.height/2, 1.25);
+  });
+  zoomOutBtn.addEventListener('click', ()=>{
+    zoomAt(canvas.width/2, canvas.height/2, 1/1.25);
+  });
+  zoomResetBtn.addEventListener('click', ()=>{
+    scale = BASE_SCALE;
+    originX = canvas.width/2;
+    originY = canvas.height/2;
+    updateZoomLabel();
+    draw();
+  });
+
+  canvas.addEventListener('click', (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    handlePointerTap(e.clientX - rect.left, e.clientY - rect.top);
+  });
+
+  // ---------- タッチ操作（スマホ）----------
+  // ・基準点／打った点をつかんでドラッグ → その場でつかんだ点を移動（放した位置が確定位置）
+  // ・それ以外の場所をドラッグ → ドラッグ中は距離を表示するプレビュー、放した位置に新しい点（基準点が2つ未満ならその基準点）を打つ
+  // ・2本指ピンチ → 拡大縮小＋パン
+  let pinchState = null;      // 2本指ピンチの開始状態
+  let touchMode = null;       // null | 'dragRef' | 'dragPoint' | 'placingRef' | 'placingNew'
+  let touchTargetIndex = -1;  // touchMode==='dragRef'|'dragPoint' のときの対象index
+  let touchLastPos = null;    // 直近のタッチ位置（放した瞬間の確定位置に使う）
+
+  function touchPoint(t, rect){
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+
+  function beginSingleTouch(p){
+    touchLastPos = p;
+    mouseMath = screenToMath(p.x, p.y);
+
+    if(viewOnly){
+      touchMode = null;
+      return;
+    }
+
+    const refHit = hitTestRef(p.x, p.y);
+    if(refHit !== -1){
+      touchMode = 'dragRef';
+      touchTargetIndex = refHit;
+      draw();
+      return;
+    }
+    const pHit = hitTestPlaced(p.x, p.y);
+    if(pHit !== -1){
+      touchMode = 'dragPoint';
+      touchTargetIndex = pHit;
+      selectedIndex = pHit;
+      updateStatus();
+      updateTable();
+      draw();
+      return;
+    }
+    // 何もつかんでいない＝空いている場所：ドラッグで新しい点（または基準点）を打つ操作
+    touchMode = (refPoints.length < 2) ? 'placingRef' : 'placingNew';
+    updateFloatLabel(p.x, p.y);
+    draw();
+  }
+
+  function moveSingleTouch(p){
+    touchLastPos = p;
+    mouseMath = screenToMath(p.x, p.y);
+
+    if(touchMode === 'dragRef'){
+      refPoints[touchTargetIndex] = mouseMath;
+      if(selectedIndex !== -1) recomputeDistancesFor(selectedIndex);
+      updateStatus();
+      updateTable();
+    } else if(touchMode === 'dragPoint'){
+      const pt = placedPoints[touchTargetIndex];
+      pt.x = mouseMath.x;
+      pt.y = mouseMath.y;
+      recomputeDistancesFor(touchTargetIndex);
+      updateStatus();
+      updateTable();
+    }
+    updateFloatLabel(p.x, p.y);
+    draw();
+  }
+
+  function finishSingleTouch(){
+    if(touchMode === 'placingRef'){
+      if(refPoints.length < 2 && touchLastPos){
+        refPoints.push(screenToMath(touchLastPos.x, touchLastPos.y));
+        updateStatus();
+        updateTable();
+      }
+    } else if(touchMode === 'placingNew'){
+      if(touchLastPos){
+        const m = screenToMath(touchLastPos.x, touchLastPos.y);
+        placedPoints.push({
+          x: m.x, y: m.y,
+          distA: dist(m, refPoints[0]),
+          distB: dist(m, refPoints[1])
+        });
+        updateStatus();
+        updateTable();
+      }
+    }
+    // dragRef / dragPoint はドラッグ中にすでに座標を反映済みなので、ここで追加の処理は不要
+    touchMode = null;
+    touchTargetIndex = -1;
+    touchLastPos = null;
+    mouseMath = null;
+    floatLabel.style.display = 'none';
+    draw();
+  }
+
+  canvas.addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    if(e.touches.length === 1){
+      pinchState = null;
+      beginSingleTouch(touchPoint(e.touches[0], rect));
+    } else if(e.touches.length === 2){
+      // 単指操作中だった場合は確定せずにキャンセルしてピンチへ切り替える
+      touchMode = null;
+      touchTargetIndex = -1;
+      touchLastPos = null;
+      const p1 = touchPoint(e.touches[0], rect);
+      const p2 = touchPoint(e.touches[1], rect);
+      pinchState = {
+        startDist: Math.max(1, Math.hypot(p2.x-p1.x, p2.y-p1.y)),
+        startScale: scale,
+        startOriginX: originX,
+        startOriginY: originY,
+        startMid: { x: (p1.x+p2.x)/2, y: (p1.y+p2.y)/2 }
+      };
+    }
+  }, { passive:false });
+
+  canvas.addEventListener('touchmove', (e)=>{
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    if(e.touches.length === 1 && pinchState === null){
+      moveSingleTouch(touchPoint(e.touches[0], rect));
+    } else if(e.touches.length === 2 && pinchState){
+      const p1 = touchPoint(e.touches[0], rect);
+      const p2 = touchPoint(e.touches[1], rect);
+      const dist2 = Math.max(1, Math.hypot(p2.x-p1.x, p2.y-p1.y));
+      const mid = { x: (p1.x+p2.x)/2, y: (p1.y+p2.y)/2 };
+      const factor = dist2 / pinchState.startDist;
+      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, pinchState.startScale*factor));
+      // ピンチ開始時の中心点が指の中点に追従するように拡大とパンを同時に行う
+      const mathAtStart = {
+        x: (pinchState.startMid.x - pinchState.startOriginX)/pinchState.startScale,
+        y: (pinchState.startOriginY - pinchState.startMid.y)/pinchState.startScale
+      };
+      scale = newScale;
+      originX = mid.x - mathAtStart.x*scale;
+      originY = mid.y + mathAtStart.y*scale;
+      updateZoomLabel();
+      draw();
+    }
+  }, { passive:false });
+
+  function endTouch(e){
+    if(e.touches.length === 0){
+      if(pinchState === null){
+        finishSingleTouch();
+      } else {
+        pinchState = null;
+      }
+    } else if(e.touches.length === 1){
+      // 2本指→1本指：ピンチを終えて、残った指の位置から単指操作を新たに始める
+      pinchState = null;
+      const rect = canvas.getBoundingClientRect();
+      beginSingleTouch(touchPoint(e.touches[0], rect));
+    }
+  }
+  canvas.addEventListener('touchend', endTouch, { passive:false });
+  canvas.addEventListener('touchcancel', ()=>{
+    pinchState = null;
+    touchMode = null;
+    touchTargetIndex = -1;
+    touchLastPos = null;
+    mouseMath = null;
+    floatLabel.style.display = 'none';
+    draw();
+  }, { passive:false });
+
+  modePlaceBtn.addEventListener('click', ()=>{
+    if(viewOnly) return;
+    mode = 'place';
+    selectedIndex = -1;
+    draggingTarget = null;
+    updateModeButtons();
+    updateStatus();
+    updateTable();
+    draw();
+  });
+
+  modeEditBtn.addEventListener('click', ()=>{
+    if(viewOnly) return;
+    mode = 'edit';
+    draggingTarget = null;
+    updateModeButtons();
+    updateStatus();
+    updateTable();
+    draw();
+  });
+
+  resetRefBtn.addEventListener('click', ()=>{
+    if(viewOnly) return;
+    refPoints = [];
+    updateStatus();
+    updateTable();
+    draw();
+  });
+
+  clearPointsBtn.addEventListener('click', ()=>{
+    if(viewOnly) return;
+    placedPoints = [];
+    selectedIndex = -1;
+    updateStatus();
+    updateTable();
+    draw();
+  });
+
+  undoBtn.addEventListener('click', ()=>{
+    if(viewOnly) return;
+    placedPoints.pop();
+    if(selectedIndex >= placedPoints.length) selectedIndex = -1;
+    updateStatus();
+    updateTable();
+    draw();
+  });
+
+  // ---------- ニックネーム（この端末だけのローカル記憶。共有はされない） ----------
+  const NICK_KEY = 'point_plotter_nickname';
+  nicknameInput.value = localStorage.getItem(NICK_KEY) || '';
+  nicknameInput.addEventListener('change', ()=>{
+    localStorage.setItem(NICK_KEY, nicknameInput.value.trim());
+  });
+  function currentNickname(){
+    return nicknameInput.value.trim() || '名無し';
+  }
+
+  // ---------- ストレージ共通処理（オフライン版：常にこのブラウザのlocalStorageを使う） ----------
+  function localKey(key, shared){ return (shared ? 'shared:' : 'own:') + key; }
+
+  async function storageSet(key, value, shared){
+    try{
+      localStorage.setItem(localKey(key, shared), value);
+      return true;
+    } catch(e){
+      // 主な原因はブラウザの保存容量オーバー（localStorageの上限は数MB程度）
+      console.error('storageSet error', e);
+      return null;
+    }
+  }
+  async function storageGet(key, shared){
+    try{
+      return localStorage.getItem(localKey(key, shared));
+    } catch(e){
+      console.error('storageGet error', e);
+      return null;
+    }
+  }
+  async function storageDelete(key, shared){
+    try{
+      localStorage.removeItem(localKey(key, shared));
+      return true;
+    } catch(e){
+      console.error('storageDelete error', e);
+      return null;
+    }
+  }
+  async function storageList(prefix, shared){
+    try{
+      const p = localKey(prefix, shared);
+      return Object.keys(localStorage).filter(k=>k.startsWith(p)).map(k=>k.slice(p.length - prefix.length));
+    } catch(e){
+      console.error('storageList error', e);
+      return [];
+    }
+  }
+
+  function fmtTimestamp(ts){
+    if(!ts) return '';
+    const d = new Date(ts);
+    const pad = (n)=> n.toString().padStart(2,'0');
+    return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- 自分の作業の下書き自動保存 ----------
+  // 注意：ここは必ずブラウザ自身のlocalStorageに保存する（window.storageのshared:falseは使わない）。
+  // window.storageの「個人」領域は、同じArtifactを開いた別の人からも見えてしまう場合があるため、
+  // 他人に絶対に見られたくないこの下書きは、常にこの端末・このブラウザだけに閉じたlocalStorageで扱う。
+  const DRAFT_KEY = 'point_plotter_local_draft_v1';
+  let draftSaveTimer = null;
+  function scheduleDraftSave(){
+    if(viewOnly) return; // 閲覧中は他人の記録なので自分の下書きとしては保存しない
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(()=>{
+      try{
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ refPoints, placedPoints }));
+      } catch(e){ /* 保存できなくても致命的ではないので無視 */ }
+    }, 500);
+  }
+  async function restoreDraft(){
+    let raw = null;
+    try{ raw = localStorage.getItem(DRAFT_KEY); } catch(e){ raw = null; }
+    if(!raw) return;
+    try{
+      const data = JSON.parse(raw);
+      refPoints = Array.isArray(data.refPoints) ? data.refPoints : [];
+      placedPoints = Array.isArray(data.placedPoints) ? data.placedPoints : [];
+    } catch(e){ /* 壊れていた場合は無視 */ }
+  }
+
+  // ---------- サムネイル生成 ----------
+  function generateThumbnail(){
+    const W = 200, H = 140;
+    const off = document.createElement('canvas');
+    off.width = W; off.height = H;
+    const octx = off.getContext('2d');
+
+    octx.fillStyle = getVar('--bg') || '#1e2430';
+    octx.fillRect(0, 0, W, H);
+
+    const allPts = [...refPoints, ...placedPoints];
+    if(allPts.length === 0){
+      octx.fillStyle = getVar('--sub') || '#9aa3b8';
+      octx.font = '12px sans-serif';
+      octx.textAlign = 'center';
+      octx.textBaseline = 'middle';
+      octx.fillText('(点なし)', W/2, H/2);
+      return off.toDataURL('image/png');
+    }
+
+    let minX = Math.min(...allPts.map(p=>p.x));
+    let maxX = Math.max(...allPts.map(p=>p.x));
+    let minY = Math.min(...allPts.map(p=>p.y));
+    let maxY = Math.max(...allPts.map(p=>p.y));
+    if(maxX - minX < 1e-6){ minX -= 1; maxX += 1; }
+    if(maxY - minY < 1e-6){ minY -= 1; maxY += 1; }
+    const pad = Math.max(maxX-minX, maxY-minY) * 0.15 || 1;
+    minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+
+    const marginPx = 12;
+    const s = Math.min((W-2*marginPx)/(maxX-minX), (H-2*marginPx)/(maxY-minY));
+    const cx = (minX+maxX)/2, cy = (minY+maxY)/2;
+    const toPx = (x,y)=>({ x: W/2 + (x-cx)*s, y: H/2 - (y-cy)*s });
+
+    octx.fillStyle = getVar('--point') || '#ffd43b';
+    placedPoints.forEach(p=>{
+      const q = toPx(p.x, p.y);
+      octx.beginPath();
+      octx.arc(q.x, q.y, 2.6, 0, Math.PI*2);
+      octx.fill();
+    });
+
+    refPoints.forEach((p, idx)=>{
+      const q = toPx(p.x, p.y);
+      octx.fillStyle = idx===0 ? (getVar('--accentA')||'#ff6b6b') : (getVar('--accentB')||'#4dabf7');
+      octx.beginPath();
+      octx.arc(q.x, q.y, 3.4, 0, Math.PI*2);
+      octx.fill();
+      octx.strokeStyle = 'rgba(255,255,255,0.6)';
+      octx.lineWidth = 1;
+      octx.stroke();
+    });
+
+    return off.toDataURL('image/png');
+  }
+
+  function downloadRecordAsJson(record){
+    try{
+      const blob = new Blob([JSON.stringify(record)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (record.title || '記録').replace(/[\\/:*?"<>|]/g, '_') + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=> URL.revokeObjectURL(url), 1000);
+    } catch(e){
+      console.error('downloadRecordAsJson error', e);
+    }
+  }
+
+  // ---------- ファイルから読み込んだ記録（この端末だけに表示。共有はされない） ----------
+  const LOCAL_IMPORTS_KEY = 'point_plotter_local_imports_v1';
+  function loadLocalImports(){
+    try{
+      const raw = localStorage.getItem(LOCAL_IMPORTS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch(e){
+      return [];
+    }
+  }
+  function saveLocalImports(arr){
+    try{ localStorage.setItem(LOCAL_IMPORTS_KEY, JSON.stringify(arr)); } catch(e){ /* noop */ }
+  }
+  function addLocalImport(record){
+    let arr = loadLocalImports();
+    arr = arr.filter(r => r.id !== record.id);
+    arr.push(record);
+    saveLocalImports(arr);
+  }
+  function removeLocalImport(id){
+    const arr = loadLocalImports().filter(r => r.id !== id);
+    saveLocalImports(arr);
+  }
+
+  importFileBtn.addEventListener('click', ()=> importFileInput.click());
+  importFileInput.addEventListener('change', async ()=>{
+    const files = Array.from(importFileInput.files || []);
+    if(files.length === 0) return;
+    let okCount = 0, ngCount = 0;
+    for(const file of files){
+      try{
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if(!data || !Array.isArray(data.refPoints) || !Array.isArray(data.placedPoints)){
+          ngCount++;
+          continue;
+        }
+        if(!data.id) data.id = Date.now() + '-' + Math.random().toString(36).slice(2,8);
+        if(!data.savedAt) data.savedAt = Date.now();
+        addLocalImport(data);
+        okCount++;
+      } catch(e){
+        ngCount++;
+      }
+    }
+    importFileInput.value = '';
+    renderGallery();
+    const msg = ngCount === 0
+      ? `${okCount}件読み込みました（この端末だけに表示されます）。`
+      : `${okCount}件読み込みました（${ngCount}件は読み込めませんでした）。`;
+    galleryImportMsg.textContent = msg;
+    galleryImportMsg.style.display = 'block';
+    clearTimeout(galleryImportMsgTimer);
+    galleryImportMsgTimer = setTimeout(()=>{ galleryImportMsg.style.display = 'none'; }, 5000);
+  });
+
+
+  function canvasKeyFor(id){ return 'canvas:' + id; }
+
+  function buildRecord(title){
+    const now = Date.now();
+    let id, creator, createdAt, lastEditedBy;
+    if(editingId){
+      id = editingId;
+      creator = (editingOriginal && editingOriginal.creator) || currentNickname();
+      createdAt = (editingOriginal && editingOriginal.createdAt) || now;
+      const editor = currentNickname();
+      lastEditedBy = (editor !== creator) ? editor : ((editingOriginal && editingOriginal.lastEditedBy) || undefined);
+    } else {
+      id = now + '-' + Math.random().toString(36).slice(2,8);
+      creator = currentNickname();
+      createdAt = now;
+    }
+    const record = {
+      id: id,
+      title: title,
+      creator: creator,
+      createdAt: createdAt,
+      refPoints: refPoints,
+      placedPoints: placedPoints,
+      thumbnail: generateThumbnail(),
+      savedAt: now
+    };
+    if(lastEditedBy) record.lastEditedBy = lastEditedBy;
+    return record;
+  }
+
+  async function publishSnapshot(record){
+    const ok = await storageSet(canvasKeyFor(record.id), JSON.stringify(record), true);
+    return ok !== null;
+  }
+
+  async function fetchAllSnapshots(){
+    const keys = await storageList('canvas:', true);
+    const items = [];
+    for(const key of keys){
+      const raw = await storageGet(key, true);
+      if(!raw) continue;
+      try{ items.push(JSON.parse(raw)); } catch(e){ /* 壊れたデータはスキップ */ }
+    }
+    const localItems = loadLocalImports().map(r => ({ ...r, _local: true }));
+    const merged = items.concat(localItems);
+    merged.sort((a,b)=> (b.savedAt||0) - (a.savedAt||0));
+    return merged;
+  }
+
+  async function deleteSnapshotById(item){
+    if(item._local){
+      removeLocalImport(item.id);
+    } else {
+      await storageDelete(canvasKeyFor(item.id), true);
+    }
+  }
+
+  async function renderGallery(){
+    galleryList.innerHTML = '<div class="galleryEmpty">読み込み中…</div>';
+    const items = await fetchAllSnapshots();
+    galleryList.innerHTML = '';
+    if(items.length === 0){
+      galleryList.innerHTML = '<div class="galleryEmpty">まだ保存された記録がありません。「①点を打つ」タブで点を打って保存してみましょう。</div>';
+      return;
+    }
+    items.forEach(item=>{
+      const card = document.createElement('div');
+      card.className = 'galleryCard';
+      const n = Array.isArray(item.placedPoints) ? item.placedPoints.length : 0;
+      const thumbHtml = item.thumbnail
+        ? `<img class="gThumb" src="${item.thumbnail}" alt="${escapeHtml(item.title||'')}のサムネイル">`
+        : `<div class="gThumb gThumbEmpty">画像なし</div>`;
+      const editedNote = (item.lastEditedBy && item.lastEditedBy !== item.creator)
+        ? `（${escapeHtml(item.lastEditedBy)}さんが編集）` : '';
+      const localNote = item._local ? `<br><span style="color:#ffd43b;">（この端末にのみ表示・ファイルから読み込み）</span>` : '';
+      card.innerHTML = `
+        ${thumbHtml}
+        <div>
+          <div class="gTitle">${escapeHtml(item.title || '(無題)')}</div>
+          <div class="gMeta">${escapeHtml(item.creator || '名無し')}さん・${fmtTimestamp(item.savedAt)}${editedNote}${localNote}</div>
+        </div>
+        <div class="gSpacer"></div>
+        <div class="gCount">点${n}個</div>
+        <button class="openBtn">開く</button>
+        <button class="editBtn">編集</button>
+        <button class="deleteBtn">削除</button>
+      `;
+      card.querySelector('.openBtn').addEventListener('click', ()=> enterViewMode(item));
+      card.querySelector('.editBtn').addEventListener('click', ()=> enterEditMode(item));
+      const delBtn = card.querySelector('.deleteBtn');
+      delBtn.addEventListener('click', async ()=>{
+        if(delBtn.dataset.confirming !== '1'){
+          delBtn.dataset.confirming = '1';
+          delBtn.textContent = '本当に削除？';
+          delBtn.classList.add('confirming');
+          delBtn.title = 'もう一度押すと削除されます';
+          clearTimeout(delBtn._revertTimer);
+          delBtn._revertTimer = setTimeout(()=>{
+            delBtn.dataset.confirming = '';
+            delBtn.textContent = '削除';
+            delBtn.classList.remove('confirming');
+          }, 3500);
+          return;
+        }
+        clearTimeout(delBtn._revertTimer);
+        delBtn.disabled = true;
+        delBtn.textContent = '削除中…';
+        await deleteSnapshotById(item);
+        renderGallery();
+      });
+      galleryList.appendChild(card);
+    });
+  }
+
+  function backupOwnWorkIfNeeded(){
+    if(bannerMode === null){
+      ownRefPoints = refPoints;
+      ownPlacedPoints = placedPoints;
+    }
+  }
+
+  function enterViewMode(item){
+    backupOwnWorkIfNeeded();
+    bannerMode = 'view';
+    viewOnly = true;
+    editingId = null;
+    editingOriginal = null;
+    refPoints = Array.isArray(item.refPoints) ? item.refPoints.map(p=>({...p})) : [];
+    placedPoints = Array.isArray(item.placedPoints) ? item.placedPoints.map(p=>({...p})) : [];
+    selectedIndex = -1;
+    mode = 'place';
+    draggingTarget = null;
+    viewBannerMsg.innerHTML = `<b>${escapeHtml(item.title || '(無題)')}</b> を表示中（閲覧専用・${escapeHtml(item.creator || '名無し')}さんの記録）`;
+    backToOwnBtn.textContent = '自分の作業に戻る';
+    viewBanner.style.display = 'flex';
+    saveSection.style.display = 'none';
+    [resetRefBtn, clearPointsBtn, undoBtn, modePlaceBtn, modeEditBtn].forEach(b=> b.disabled = true);
+    switchTab('plot');
+    updateModeButtons();
+    updateStatus();
+    updateTable();
+    draw();
+  }
+
+  function enterEditMode(item){
+    backupOwnWorkIfNeeded();
+    bannerMode = 'edit';
+    viewOnly = false;
+    editingId = item.id;
+    editingOriginal = {
+      creator: item.creator || '名無し',
+      createdAt: item.createdAt || item.savedAt || Date.now(),
+      lastEditedBy: item.lastEditedBy
+    };
+    refPoints = Array.isArray(item.refPoints) ? item.refPoints.map(p=>({...p})) : [];
+    placedPoints = Array.isArray(item.placedPoints) ? item.placedPoints.map(p=>({...p})) : [];
+    selectedIndex = -1;
+    mode = 'place';
+    draggingTarget = null;
+    saveNameInput.value = item.title || '';
+    saveBtn.textContent = '更新する';
+    viewBannerMsg.innerHTML = `<b>${escapeHtml(item.title || '(無題)')}</b>（${escapeHtml(editingOriginal.creator)}さんの記録）を編集中。保存すると元の記録が上書きされます`;
+    backToOwnBtn.textContent = '編集をやめて自分の作業に戻る';
+    viewBanner.style.display = 'flex';
+    saveSection.style.display = 'flex';
+    [resetRefBtn, clearPointsBtn, undoBtn, modePlaceBtn, modeEditBtn].forEach(b=> b.disabled = false);
+    switchTab('plot');
+    updateModeButtons();
+    updateStatus();
+    updateTable();
+    draw();
+  }
+
+  function exitSpecialMode(){
+    bannerMode = null;
+    viewOnly = false;
+    editingId = null;
+    editingOriginal = null;
+    refPoints = ownRefPoints;
+    placedPoints = ownPlacedPoints;
+    selectedIndex = -1;
+    mode = 'place';
+    draggingTarget = null;
+    saveNameInput.value = '';
+    saveBtn.textContent = '保存する';
+    viewBanner.style.display = 'none';
+    saveSection.style.display = 'flex';
+    [resetRefBtn, clearPointsBtn, modePlaceBtn, modeEditBtn].forEach(b=> b.disabled = false);
+    updateModeButtons();
+    updateStatus();
+    updateTable();
+    draw();
+  }
+
+  backToOwnBtn.addEventListener('click', exitSpecialMode);
+
+  // ---------- 右パネルの開閉（狭い画面ではドロワーとして表示） ----------
+  function openPanel(){ document.body.classList.add('panelOpen'); }
+  function closePanel(){ document.body.classList.remove('panelOpen'); }
+  panelToggleBtn.addEventListener('click', ()=>{
+    document.body.classList.toggle('panelOpen');
+  });
+  panelCloseBtn.addEventListener('click', closePanel);
+  panelBackdrop.addEventListener('click', closePanel);
+
+  // ---------- タブ切替 ----------
+  function switchTab(name){
+    const toPlot = (name === 'plot');
+    tabPlotBtn.classList.toggle('active', toPlot);
+    tabGalleryBtn.classList.toggle('active', !toPlot);
+    plotView.style.display = toPlot ? 'flex' : 'none';
+    galleryView.style.display = toPlot ? 'none' : 'block';
+    panelToggleBtn.style.visibility = toPlot ? 'visible' : 'hidden';
+    if(!toPlot) closePanel();
+    if(toPlot){
+      resizeCanvas();
+    } else {
+      renderGallery();
+    }
+  }
+  tabPlotBtn.addEventListener('click', ()=> switchTab('plot'));
+  tabGalleryBtn.addEventListener('click', ()=> switchTab('gallery'));
+  galleryRefreshBtn.addEventListener('click', ()=> renderGallery());
+
+  // ---------- 保存（公開）ボタン ----------
+  let saveStatusTimer = null;
+  function showSaveStatus(msg, isError){
+    saveStatusMsg.textContent = msg;
+    saveStatusMsg.style.color = isError ? '#ff8a8a' : '#63e6be';
+    saveStatusMsg.style.display = 'block';
+    clearTimeout(saveStatusTimer);
+    saveStatusTimer = setTimeout(()=>{ saveStatusMsg.style.display = 'none'; }, 4000);
+  }
+
+  let lastFailedRecord = null;
+
+  saveBtn.addEventListener('click', async ()=>{
+    if(viewOnly) return;
+    if(placedPoints.length === 0){
+      showSaveStatus('まだ点が打たれていません。点を打ってから保存してください。', true);
+      return;
+    }
+    const isEditing = !!editingId;
+    let title = saveNameInput.value.trim() || '記録';
+    saveBtn.disabled = true;
+    saveBtn.textContent = isEditing ? '更新中…' : '保存中…';
+    downloadFallbackBtn.style.display = 'none';
+    const record = buildRecord(title);
+    const ok = await publishSnapshot(record);
+    saveBtn.disabled = false;
+    saveBtn.textContent = isEditing ? '更新する' : '保存する';
+    if(ok){
+      lastFailedRecord = null;
+      if(isEditing){
+        editingOriginal.lastEditedBy = currentNickname();
+        showSaveStatus('更新しました。「②保存した記録」タブから見られます。', false);
+      } else {
+        saveNameInput.value = '';
+        showSaveStatus('保存しました。「②保存した記録」タブから見られます。', false);
+      }
+    } else {
+      lastFailedRecord = record;
+      showSaveStatus('保存に失敗しました（ブラウザの保存容量が上限に達している可能性があります）。下の「バックアップとしてファイルに書き出す」でファイルに保存することもできます。', true);
+      downloadFallbackBtn.style.display = 'inline-flex';
+    }
+  });
+
+  downloadFallbackBtn.addEventListener('click', ()=>{
+    if(!lastFailedRecord) return;
+    downloadRecordAsJson(lastFailedRecord);
+  });
+
+  saveNameInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') saveBtn.click();
+  });
+
+  (async function init(){
+    await restoreDraft();
+    resizeCanvas();
+    updateModeButtons();
+    updateZoomLabel();
+    updateStatus();
+    updateTable();
+  })();
+})();
+</script>
+</body>
+</html>
